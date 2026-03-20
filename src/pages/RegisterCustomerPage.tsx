@@ -47,17 +47,20 @@ export default function RegisterCustomerPage({
     }
 
     const { error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-    });
+  email: form.email,
+  password: form.password,
+  options: {
+    emailRedirectTo: window.location.origin,
+  },
+});
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
+if (error) {
+  alert(error.message);
+  return;
+}
 
-    alert('Registrazione completata! Ora puoi fare login.');
-    onBack();
+alert('Registrazione completata! Controlla la tua email per confermare l’account.');
+onBack();
   };
 
   return (

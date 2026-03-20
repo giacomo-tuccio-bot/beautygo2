@@ -140,20 +140,41 @@ export default function RegisterProfessionalPage({
         return;
       }
 
-      let {
-        data: { session },
-      } = await supabase.auth.getSession();
+     const handleSubmit = async () => {
+  if (isSubmitting) return;
+  if (!validate()) return;
 
-      if (!session) {
-        const signInResult = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: cleanPassword,
-        });
+  setIsSubmitting(true);
 
-        if (!signInResult.error) {
-          session = signInResult.data.session;
-        }
-      }
+  const cleanEmail = form.email.trim().toLowerCase();
+  const cleanPassword = form.password.trim();
+
+  try {
+    const { error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password: cleanPassword,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert('Registrazione completata! Controlla la tua email per confermare l’account.');
+
+    // dopo registrazione → vai al login
+    onGoLogin();
+
+  } catch (error) {
+    console.error('Errore registrazione professionista:', error);
+    alert('Errore durante la registrazione professionista.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
       if (!session) {
         alert(
