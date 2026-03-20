@@ -1291,6 +1291,8 @@ export default function App() {
 
     return (
       <ProfilePage
+        currentTab={tab}
+        onChangeTab={handleTabChange}
         onGoLogin={() => setScreen('login')}
         onGoRegisterCustomer={() => setScreen('registerCustomer')}
         onGoRegisterProfessional={() => setScreen('registerProfessional')}

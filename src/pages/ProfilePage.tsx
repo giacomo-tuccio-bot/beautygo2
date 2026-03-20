@@ -1,10 +1,17 @@
+import BottomNav from '../components/BottomNav';
 import { colors } from '../theme';
 
+type Tab = 'home' | 'discover' | 'bookings' | 'profile';
+
 export default function ProfilePage({
+  currentTab,
+  onChangeTab,
   onGoLogin,
   onGoRegisterCustomer,
   onGoRegisterProfessional,
 }: {
+  currentTab: Tab;
+  onChangeTab: (tab: Tab) => void;
   onGoLogin: () => void;
   onGoRegisterCustomer: () => void;
   onGoRegisterProfessional: () => void;
@@ -13,9 +20,10 @@ export default function ProfilePage({
     <div
       style={{
         minHeight: '100vh',
-        padding: '18px 18px 96px',
+        padding: '18px 18px 120px',
         background:
           'radial-gradient(circle at top left, #FFE2CC 0%, #FFF1E6 30%, #F8F2EE 75%)',
+        boxSizing: 'border-box',
       }}
     >
       <h1
@@ -164,6 +172,8 @@ export default function ProfilePage({
           </div>
         </div>
       </div>
+
+      <BottomNav current={currentTab} onChange={onChangeTab} />
     </div>
   );
 }
