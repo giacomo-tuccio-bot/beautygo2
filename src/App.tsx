@@ -1290,11 +1290,15 @@ export default function App() {
     }
 
     return (
-      <ProfilePage
-        onGoLogin={() => setScreen('login')}
-        onGoRegisterCustomer={() => setScreen('registerCustomer')}
-        onGoRegisterProfessional={() => setScreen('registerProfessional')}
-      />
+     <ProfilePage
+  onGoLogin={() => setScreen('login')}
+  onGoRegisterCustomer={() => setScreen('registerCustomer')}
+  onGoRegisterProfessional={() => setScreen('registerProfessional')}
+  onBackToHome={() => {
+    setScreen('tabs');
+    setTab('home');
+  }}
+/>
     );
   };
 
