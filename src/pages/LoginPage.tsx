@@ -265,22 +265,7 @@ export default function LoginPage({
           zIndex: 50,
         }}
       >
-        <button
-          onClick={onBack}
-          style={{
-            width: '100%',
-            border: 'none',
-            borderRadius: 16,
-            padding: '14px 18px',
-            background: '#FFF3E8',
-            color: '#FF7A00',
-            fontWeight: 800,
-            fontSize: 16,
-            cursor: 'pointer',
-          }}
-        >
-          ← Indietro
-        </button>
+      
       </div>
     </div>
   );
