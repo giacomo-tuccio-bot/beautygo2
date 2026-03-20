@@ -1295,8 +1295,7 @@ export default function App() {
   onGoRegisterCustomer={() => setScreen('registerCustomer')}
   onGoRegisterProfessional={() => setScreen('registerProfessional')}
   onBackToHome={() => {
-    setScreen('tabs');
-    setTab('home');
+    
   }}
 />
     );
@@ -1319,65 +1318,49 @@ export default function App() {
     );
   }
 
-  if (screen === 'login') {
-    return (
-      <LoginPage
-        onBack={() => {
-          setScreen('tabs');
-          setTab('profile');
-        }}
-        onAdminLogin={() => {
-          setSessionUserId(null);
-          setUserRole('admin');
-          setScreen('tabs');
-          setTab('profile');
-          resetProfessionalWorkflowState();
-        }}
-        onLoginSuccess={bootstrapAuth}
-        onGoRegisterCustomer={() => setScreen('registerCustomer')}
-        onGoRegisterProfessional={() => setScreen('registerProfessional')}
-      />
-    );
-  }
+// 🔹 SCHERMATE SECONDARIE
 
-  if (screen === 'registerCustomer') {
-    return (
-    <RegisterCustomerPage
-      onBack={() => {
+if (screen === 'login') {
+  return (
+    <LoginPage
+      onBack={() => setScreen('tabs')}
+      onAdminLogin={handleAdminLogin}
+      onLoginSuccess={() => {
         setScreen('tabs');
-        setTab('profile');
+        setTab('home');
       }}
+      onGoRegisterCustomer={() => setScreen('registerCustomer')}
+      onGoRegisterProfessional={() => setScreen('registerProfessional')}
     />
   );
-  }
+}
 
-  if (screen === 'registerProfessional') {
-    return (
-      <RegisterProfessionalPage
-        onBack={() => {
-          setScreen('tabs');
-          setTab('profile');
-        }}
-        onGoLogin={() => setScreen('login')}
-        onRegistrationComplete={handleProfessionalOnboardingComplete}
-      />
-    );
-  }
+if (screen === 'registerCustomer') {
+  return (
+    <RegisterCustomerPage
+      onBack={() => setScreen('tabs')}
+    />
+  );
+}
 
-  if (screen === 'proOnboarding') {
-    return (
-      <ProOnboardingPage
-        isAuthenticated={userRole !== 'guest'}
-        currentUserEmail={professionalProfileData.email}
-        onBack={() => {
-          setScreen('tabs');
-          setTab('profile');
-        }}
-        onGoLogin={() => setScreen('login')}
-        onComplete={handleProfessionalOnboardingComplete}
-      />
-    );
-  }
+if (screen === 'registerProfessional') {
+  return (
+    <RegisterProfessionalPage
+      onBack={() => setScreen('tabs')}
+    />
+  );
+}
+
+if (screen === 'proOnboarding') {
+  return (
+    <ProOnboardingPage
+      isAuthenticated={role !== 'guest'}
+      onBack={() => setScreen('tabs')}
+      onGoLogin={() => setScreen('login')}
+      onSubmit={handleProfessionalOnboardingSubmit}
+    />
+  );
+}
 
   if (screen === 'professionalDetail') {
     return (
