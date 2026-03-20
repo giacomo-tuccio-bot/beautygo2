@@ -1318,7 +1318,10 @@ export default function App() {
   if (screen === 'login') {
     return (
       <LoginPage
-        onBack={() => setScreen('tabs')}
+        onBack={() => {
+          setScreen('tabs');
+          setTab('profile');
+        }}
         onAdminLogin={() => {
           setSessionUserId(null);
           setUserRole('admin');
@@ -1334,13 +1337,23 @@ export default function App() {
   }
 
   if (screen === 'registerCustomer') {
-    return <RegisterCustomerPage onBack={() => setScreen('tabs')} />;
+    return (
+    <RegisterCustomerPage
+      onBack={() => {
+        setScreen('tabs');
+        setTab('profile');
+      }}
+    />
+  );
   }
 
   if (screen === 'registerProfessional') {
     return (
       <RegisterProfessionalPage
-        onBack={() => setScreen('tabs')}
+        onBack={() => {
+          setScreen('tabs');
+          setTab('profile');
+        }}
         onGoLogin={() => setScreen('login')}
         onRegistrationComplete={handleProfessionalOnboardingComplete}
       />
@@ -1352,7 +1365,10 @@ export default function App() {
       <ProOnboardingPage
         isAuthenticated={userRole !== 'guest'}
         currentUserEmail={professionalProfileData.email}
-        onBack={() => setScreen('tabs')}
+        onBack={() => {
+          setScreen('tabs');
+          setTab('profile');
+        }}
         onGoLogin={() => setScreen('login')}
         onComplete={handleProfessionalOnboardingComplete}
       />

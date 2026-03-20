@@ -89,6 +89,8 @@ export default function LoginPage({
           'radial-gradient(circle at top left, #FFE2CC 0%, #FFF1E6 30%, #F8F2EE 75%)',
       }}
     >
+      <TopBack onBack={onBack} />
+
       <h1
         style={{
           margin: '4px 0 0',
@@ -281,5 +283,28 @@ export default function LoginPage({
         </button>
       </div>
     </div>
+  );
+}
+
+
+function TopBack({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      onClick={onBack}
+      style={{
+        border: 'none',
+        background: '#FFFFFF',
+        color: '#FF7A00',
+        fontWeight: 800,
+        fontSize: 15,
+        padding: '12px 14px',
+        borderRadius: 14,
+        boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
+        cursor: 'pointer',
+        marginBottom: 10,
+      }}
+    >
+      ← Indietro
+    </button>
   );
 }
