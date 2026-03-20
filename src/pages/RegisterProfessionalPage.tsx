@@ -13,7 +13,7 @@ export default function RegisterProfessionalPage({
   onGoLogin,
 }: {
   onBack: () => void;
-  onRegistrationComplete: (data: ProOnboardingFormData) => void | Promise<void>;
+  onRegistrationComplete?: (data: ProOnboardingFormData) => void | Promise<void>;
   onGoLogin: () => void;
 }) {
   const [form, setForm] = useState<RegisterProfessionalFormData>({
@@ -37,6 +37,7 @@ export default function RegisterProfessionalPage({
     pec: '',
     codiceDestinatario: '',
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isVat = form.tipoDocumentoFiscale === 'piva';
@@ -130,83 +131,38 @@ export default function RegisterProfessionalPage({
     const cleanPassword = form.password.trim();
 
     try {
-      const signUpResult = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password: cleanPassword,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            role: 'professional',
+            nome: form.nome,
+            cognome: form.cognome,
+            telefono: form.telefono,
+            citta: form.citta,
+            indirizzo: form.indirizzo,
+          },
+        },
       });
 
-      if (signUpResult.error) {
-        alert(signUpResult.error.message);
+      if (error) {
+        alert(error.message);
         return;
       }
 
-     const handleSubmit = async () => {
-  if (isSubmitting) return;
-  if (!validate()) return;
+      console.log('Signup professionista riuscito:', data);
 
-  setIsSubmitting(true);
-
-  const cleanEmail = form.email.trim().toLowerCase();
-  const cleanPassword = form.password.trim();
-
-  try {
-    const { error } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password: cleanPassword,
-      options: {
-        emailRedirectTo: window.location.origin,
-      },
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert('Registrazione completata! Controlla la tua email per confermare l’account.');
-
-    // dopo registrazione → vai al login
-    onGoLogin();
-
-  } catch (error) {
-    console.error('Errore registrazione professionista:', error);
-    alert('Errore durante la registrazione professionista.');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-
-      if (!session) {
-        alert(
-          'Account creato, ma la sessione non è stata aperta automaticamente. Effettua il login e completa il profilo professionista.'
-        );
-        onGoLogin();
-        return;
-      }
-
-      await onRegistrationComplete({
-        nome: form.nome,
-        cognome: form.cognome,
-        email: cleanEmail,
-        telefono: form.telefono,
-        citta: form.citta,
-        indirizzo: form.indirizzo,
-        tipoDocumentoFiscale: form.tipoDocumentoFiscale,
-        valoreDocumentoFiscale: form.valoreDocumentoFiscale,
-        intestatarioFatturazione: form.intestatarioFatturazione,
-        ragioneSociale: form.ragioneSociale,
-        codiceFiscaleFatturazione: form.codiceFiscaleFatturazione,
-        partitaIvaFatturazione: form.partitaIvaFatturazione,
-        indirizzoFatturazione: form.indirizzoFatturazione,
-        cittaFatturazione: form.cittaFatturazione,
-        capFatturazione: form.capFatturazione,
-        provinciaFatturazione: form.provinciaFatturazione,
-        pec: form.pec,
-        codiceDestinatario: form.codiceDestinatario,
-      });
-    } catch (error) {
-      console.error('Errore registrazione professionista:', error);
-      alert('Errore durante la registrazione professionista.');
+      alert('Registrazione completata! Controlla la tua email per confermare l’account.');
+      onGoLogin();
+    } catch (error: any) {
+      console.error('Errore durante la registrazione professionista:', error);
+      alert(
+        `Errore durante la registrazione professionista: ${
+          error?.message || JSON.stringify(error) || 'errore sconosciuto'
+        }`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -241,8 +197,7 @@ export default function RegisterProfessionalPage({
           lineHeight: 1.5,
         }}
       >
-        Registrazione completa con anagrafica, contatti e dati fiscali. I campi cambiano in
-        base alla scelta tra Partita IVA e Codice Fiscale.
+        Registrazione completa con anagrafica, contatti e dati fiscali.
       </p>
 
       <div
@@ -255,6 +210,7 @@ export default function RegisterProfessionalPage({
         }}
       >
         <div style={sectionTitle}>Dati account e contatti</div>
+
         <input
           style={inputStyle}
           placeholder="Nome *"
@@ -302,6 +258,7 @@ export default function RegisterProfessionalPage({
         />
 
         <div style={sectionTitle}>Identificazione fiscale</div>
+
         <div
           style={{
             display: 'grid',
@@ -334,9 +291,14 @@ export default function RegisterProfessionalPage({
         />
 
         <div style={sectionTitle}>Dati fiscali di fatturazione</div>
+
         <input
           style={inputStyle}
-          placeholder={isVat ? 'Intestatario fatturazione / Legale rappresentante *' : 'Intestatario fatturazione *'}
+          placeholder={
+            isVat
+              ? 'Intestatario fatturazione / Legale rappresentante *'
+              : 'Intestatario fatturazione *'
+          }
           value={form.intestatarioFatturazione}
           onChange={(e) => handleChange('intestatarioFatturazione', e.target.value)}
         />
