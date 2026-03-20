@@ -1,3 +1,4 @@
+import React from 'react';
 import { colors } from '../theme';
 import { Icon } from '../components/Icons';
 

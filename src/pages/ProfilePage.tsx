@@ -3,11 +3,11 @@ import { colors } from '../theme';
 export default function ProfilePage({
   onGoLogin,
   onGoRegisterCustomer,
-  onGoRegisterProfessional,
+  onGoProOnboarding,
 }: {
   onGoLogin: () => void;
   onGoRegisterCustomer: () => void;
-  onGoRegisterProfessional: () => void;
+  onGoProOnboarding: () => void;
 }) {
   return (
     <div
@@ -39,8 +39,7 @@ export default function ProfilePage({
           lineHeight: 1.5,
         }}
       >
-        Accedi con un solo account oppure scegli una registrazione dedicata come cliente o
-        professionista.
+        Accedi oppure registrati per prenotare servizi o lavorare con BeautyGo.
       </p>
 
       <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
@@ -60,7 +59,7 @@ export default function ProfilePage({
               textAlign: 'center',
             }}
           >
-            Accesso unico
+            Area cliente
           </div>
 
           <p
@@ -73,51 +72,14 @@ export default function ProfilePage({
               textAlign: 'center',
             }}
           >
-            Clienti e professionisti accedono dalla stessa pagina. Dopo il login il sistema
-            riconosce il profilo associato al tuo account.
+            Accedi al tuo account per gestire prenotazioni, profilo e servizi preferiti.
           </p>
 
           <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
             <button onClick={onGoLogin} style={primaryButton}>
               Accedi
             </button>
-          </div>
-        </div>
 
-        <div
-          style={{
-            background: colors.card,
-            borderRadius: 28,
-            padding: 20,
-            boxShadow: colors.shadow,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 800,
-              color: colors.text,
-              textAlign: 'center',
-            }}
-          >
-            Registrazione cliente
-          </div>
-
-          <p
-            style={{
-              marginTop: 12,
-              marginBottom: 0,
-              color: colors.muted,
-              fontSize: 15,
-              lineHeight: 1.7,
-              textAlign: 'center',
-            }}
-          >
-            Crea il tuo profilo cliente per prenotare servizi, salvare preferiti e gestire gli
-            appuntamenti.
-          </p>
-
-          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
             <button onClick={onGoRegisterCustomer} style={secondaryButton}>
               Registrati come cliente
             </button>
@@ -140,7 +102,7 @@ export default function ProfilePage({
               textAlign: 'center',
             }}
           >
-            Registrazione professionista
+            Sei un professionista?
           </div>
 
           <p
@@ -153,13 +115,17 @@ export default function ProfilePage({
               textAlign: 'center',
             }}
           >
-            Compila una registrazione completa con dati personali, professionali e fiscali.
-            Potrai indicare in modo distinto se operi con Partita IVA o Codice Fiscale.
+            Completa l’onboarding solo dopo il login. Il profilo verrà aggiornato e poi
+            potrai caricare servizi, documenti e dati fiscali dalla dashboard professionista.
           </p>
 
           <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            <button onClick={onGoRegisterProfessional} style={primaryButton}>
-              Registrati come professionista
+            <button onClick={onGoLogin} style={secondaryButton}>
+              Accedi
+            </button>
+
+            <button onClick={onGoProOnboarding} style={primaryButton}>
+              Diventa professionista
             </button>
           </div>
         </div>

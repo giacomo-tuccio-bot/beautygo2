@@ -225,7 +225,7 @@ export default function ProfessionalProfilePage({
   onRemoveProfessionalProfileImage,
   onSaveProfileData,
   onRequestFiscalChange,
-  onBack: _onBack,
+  onBack,
   onOpenSection,
   onToggleService,
   onSubmitServices,

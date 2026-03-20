@@ -8,7 +8,6 @@ import BookingsPage from './pages/BookingsPage';
 import ProfilePage from './pages/ProfilePage';
 import LoginPage from './pages/LoginPage';
 import RegisterCustomerPage from './pages/RegisterCustomerPage';
-import RegisterProfessionalPage from './pages/RegisterProfessionalPage';
 import ProOnboardingPage, {
   type ProOnboardingFormData,
 } from './pages/ProOnboardingPage';
@@ -25,7 +24,6 @@ type Screen =
   | 'tabs'
   | 'login'
   | 'registerCustomer'
-  | 'registerProfessional'
   | 'proOnboarding'
   | 'professionalDetail'
   | 'serviceProfessionals';
@@ -1293,7 +1291,7 @@ export default function App() {
       <ProfilePage
         onGoLogin={() => setScreen('login')}
         onGoRegisterCustomer={() => setScreen('registerCustomer')}
-        onGoRegisterProfessional={() => setScreen('registerProfessional')}
+        onGoProOnboarding={() => setScreen('proOnboarding')}
       />
     );
   };
@@ -1327,24 +1325,12 @@ export default function App() {
           resetProfessionalWorkflowState();
         }}
         onLoginSuccess={bootstrapAuth}
-        onGoRegisterCustomer={() => setScreen('registerCustomer')}
-        onGoRegisterProfessional={() => setScreen('registerProfessional')}
       />
     );
   }
 
   if (screen === 'registerCustomer') {
     return <RegisterCustomerPage onBack={() => setScreen('tabs')} />;
-  }
-
-  if (screen === 'registerProfessional') {
-    return (
-      <RegisterProfessionalPage
-        onBack={() => setScreen('tabs')}
-        onGoLogin={() => setScreen('login')}
-        onRegistrationComplete={handleProfessionalOnboardingComplete}
-      />
-    );
   }
 
   if (screen === 'proOnboarding') {
