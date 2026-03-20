@@ -1,11 +1,10 @@
-import React from 'react';
 import { colors } from '../theme';
 
 export default function ServiceProfessionalsPage({
   selectedServices,
   onBack,
   onOpenProfessional,
-  onGoBookings,
+  onGoBookings: _onGoBookings,
 }: {
   selectedServices: string[];
   onBack: () => void;

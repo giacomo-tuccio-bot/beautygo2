@@ -6,10 +6,14 @@ export default function LoginPage({
   onBack,
   onAdminLogin,
   onLoginSuccess,
+  onGoRegisterCustomer,
+  onGoRegisterProfessional,
 }: {
   onBack: () => void;
   onAdminLogin: () => void;
   onLoginSuccess: () => void | Promise<void>;
+  onGoRegisterCustomer?: () => void;
+  onGoRegisterProfessional?: () => void;
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -179,6 +183,46 @@ export default function LoginPage({
         >
           {isLoading ? 'Accesso in corso...' : 'Accedi'}
         </button>
+
+        {onGoRegisterCustomer ? (
+          <button
+            onClick={onGoRegisterCustomer}
+            style={{
+              width: '100%',
+              marginTop: 12,
+              border: 'none',
+              borderRadius: 16,
+              padding: '14px 14px',
+              background: '#FFF3E8',
+              color: '#FF6A00',
+              fontWeight: 800,
+              fontSize: 15,
+              cursor: 'pointer',
+            }}
+          >
+            Registrati come cliente
+          </button>
+        ) : null}
+
+        {onGoRegisterProfessional ? (
+          <button
+            onClick={onGoRegisterProfessional}
+            style={{
+              width: '100%',
+              marginTop: 12,
+              border: 'none',
+              borderRadius: 16,
+              padding: '14px 14px',
+              background: '#FFF3E8',
+              color: '#FF6A00',
+              fontWeight: 800,
+              fontSize: 15,
+              cursor: 'pointer',
+            }}
+          >
+            Registrati come professionista
+          </button>
+        ) : null}
 
         <button
           onClick={() => alert('Qui puoi collegare il reset password di Supabase Auth.')}
