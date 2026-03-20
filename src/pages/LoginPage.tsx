@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { colors } from '../theme';
 import { supabase } from '../lib/supabase';
 
 export default function LoginPage({
@@ -11,50 +10,24 @@ export default function LoginPage({
 }: {
   onBack: () => void;
   onAdminLogin: () => void;
-  onLoginSuccess: () => void | Promise<void>;
-  onGoRegisterCustomer?: () => void;
-  onGoRegisterProfessional?: () => void;
+  onLoginSuccess: () => void;
+  onGoRegisterCustomer: () => void;
+  onGoRegisterProfessional: () => void;
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const input: React.CSSProperties = {
-    width: '100%',
-    height: 54,
-    borderRadius: 16,
-    border: '1px solid #F1E4D8',
-    padding: '0 14px',
-    marginTop: 10,
-    outline: 'none',
-    fontSize: 15,
-    background: '#fff',
-    boxSizing: 'border-box',
-    color: colors.text,
-  };
 
   const handleLogin = async () => {
-    if (isLoading) return;
-
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim();
-
-    if (!cleanEmail || !cleanPassword) {
-      alert('Inserisci email e password.');
-      return;
-    }
-
-    if (cleanEmail === 'admin' && cleanPassword === 'admin') {
-      onAdminLogin();
-      return;
-    }
-
-    setIsLoading(true);
-
     try {
+      // 🔹 Admin login veloce
+      if (email === 'admin' && password === 'admin') {
+        onAdminLogin();
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: cleanPassword,
+        email,
+        password,
       });
 
       if (error) {
@@ -62,234 +35,112 @@ export default function LoginPage({
         return;
       }
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        alert('Login riuscito ma sessione non disponibile. Riprova.');
-        return;
-      }
-
-      await onLoginSuccess();
-    } catch (error) {
-      console.error('Errore login:', error);
-      alert('Errore durante il login.');
-    } finally {
-      setIsLoading(false);
+      onLoginSuccess();
+    } catch (err) {
+      console.error(err);
+      alert('Errore durante il login');
     }
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: 14,
+    border: '1px solid #ddd',
+    marginBottom: 12,
+  };
+
+  const primaryButton: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: 14,
+    border: 'none',
+    background: '#ff7a00',
+    color: '#fff',
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginTop: 10,
+  };
+
+  const secondaryButton: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: 14,
+    border: 'none',
+    background: '#e9ded6',
+    color: '#ff7a00',
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginTop: 10,
+  };
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        padding: '18px 18px 120px',
-        background:
-          'radial-gradient(circle at top left, #FFE2CC 0%, #FFF1E6 30%, #F8F2EE 75%)',
-      }}
-    >
-      <TopBack onBack={onBack} />
+    <div style={{ padding: 16 }}>
+      <h1 style={{ textAlign: 'center' }}>Accedi</h1>
 
-      <h1
-        style={{
-          margin: '4px 0 0',
-          fontSize: 30,
-          fontWeight: 800,
-          color: colors.text,
-          textAlign: 'center',
-        }}
-      >
-        Accedi
-      </h1>
-
-      <p
-        style={{
-          color: colors.muted,
-          marginTop: 8,
-          textAlign: 'center',
-          fontSize: 15,
-        }}
-      >
+      <p style={{ textAlign: 'center', marginBottom: 20 }}>
         Clienti e professionisti
       </p>
 
+      {/* FORM */}
       <div
         style={{
-          marginTop: 18,
-          background: 'rgba(255,255,255,0.96)',
-          borderRadius: 24,
-          padding: 18,
-          boxShadow: colors.shadow,
+          background: '#f5f5f5',
+          borderRadius: 20,
+          padding: 20,
         }}
       >
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: colors.muted,
-            marginBottom: 4,
-          }}
-        >
-          Email
-        </div>
+        <label>Email</label>
         <input
-          style={input}
+          style={inputStyle}
           placeholder="Inserisci la tua email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
         />
 
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: colors.muted,
-            marginTop: 14,
-            marginBottom: 4,
-          }}
-        >
-          Password
-        </div>
+        <label>Password</label>
         <input
-          style={input}
-          placeholder="Inserisci la tua password"
           type="password"
+          style={inputStyle}
+          placeholder="Inserisci la tua password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              void handleLogin();
-            }
-          }}
         />
 
-        <button
-          onClick={() => void handleLogin()}
-          disabled={isLoading}
-          style={{
-            width: '100%',
-            marginTop: 18,
-            border: 'none',
-            borderRadius: 16,
-            padding: '14px 14px',
-            background: 'linear-gradient(135deg, #FF8A1F, #FF5A00)',
-            color: '#fff',
-            fontWeight: 800,
-            fontSize: 16,
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-            opacity: isLoading ? 0.7 : 1,
-          }}
-        >
-          {isLoading ? 'Accesso in corso...' : 'Accedi'}
+        <button onClick={handleLogin} style={primaryButton}>
+          Accedi
         </button>
 
-        {onGoRegisterCustomer ? (
-          <button
-            onClick={onGoRegisterCustomer}
-            style={{
-              width: '100%',
-              marginTop: 12,
-              border: 'none',
-              borderRadius: 16,
-              padding: '14px 14px',
-              background: '#FFF3E8',
-              color: '#FF6A00',
-              fontWeight: 800,
-              fontSize: 15,
-              cursor: 'pointer',
-            }}
-          >
-            Registrati come cliente
-          </button>
-        ) : null}
+        <button onClick={onGoRegisterCustomer} style={secondaryButton}>
+          Registrati come cliente
+        </button>
 
-        {onGoRegisterProfessional ? (
-          <button
-            onClick={onGoRegisterProfessional}
-            style={{
-              width: '100%',
-              marginTop: 12,
-              border: 'none',
-              borderRadius: 16,
-              padding: '14px 14px',
-              background: '#FFF3E8',
-              color: '#FF6A00',
-              fontWeight: 800,
-              fontSize: 15,
-              cursor: 'pointer',
-            }}
-          >
-            Registrati come professionista
-          </button>
-        ) : null}
+        <button onClick={onGoRegisterProfessional} style={secondaryButton}>
+          Registrati come professionista
+        </button>
 
-        <button
-          onClick={() => alert('Qui puoi collegare il reset password di Supabase Auth.')}
-          style={{
-            width: '100%',
-            marginTop: 12,
-            border: 'none',
-            borderRadius: 16,
-            padding: '14px 14px',
-            background: '#FFF3E8',
-            color: '#FF6A00',
-            fontWeight: 800,
-            fontSize: 15,
-            cursor: 'pointer',
-          }}
-        >
+        <button style={secondaryButton}>
           Recupera password
         </button>
       </div>
 
-      <div
+      {/* 🔙 BACK BUTTON (SOLO IN BASSO) */}
+      <button
+        onClick={onBack}
         style={{
-          position: 'fixed',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          bottom: 14,
-          width: 360,
-          maxWidth: 'calc(100vw - 28px)',
-          height: 76,
-          borderRadius: 24,
-          background: 'rgba(255,255,255,0.96)',
-          backdropFilter: 'blur(16px)',
-          boxShadow: '0 18px 32px rgba(0,0,0,0.10)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0 14px',
-          zIndex: 50,
+          width: '100%',
+          padding: '14px',
+          borderRadius: 14,
+          border: 'none',
+          background: '#e9ded6',
+          color: '#ff7a00',
+          fontWeight: 600,
+          cursor: 'pointer',
+          marginTop: 20,
         }}
       >
-      
-      </div>
+        ← Indietro
+      </button>
     </div>
-  );
-}
-
-
-function TopBack({ onBack }: { onBack: () => void }) {
-  return (
-    <button
-      onClick={onBack}
-      style={{
-        border: 'none',
-        background: '#FFFFFF',
-        color: '#FF7A00',
-        fontWeight: 800,
-        fontSize: 15,
-        padding: '12px 14px',
-        borderRadius: 14,
-        boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
-        cursor: 'pointer',
-        marginBottom: 10,
-      }}
-    >
-      ← Indietro
-    </button>
   );
 }
