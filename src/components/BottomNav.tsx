@@ -1,3 +1,4 @@
+import React from 'react';
 import { Icon } from './Icons';
 
 type Tab = 'home' | 'discover' | 'bookings' | 'profile';

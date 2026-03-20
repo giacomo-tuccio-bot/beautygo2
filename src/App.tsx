@@ -8,7 +8,6 @@ import BookingsPage from './pages/BookingsPage';
 import ProfilePage from './pages/ProfilePage';
 import LoginPage from './pages/LoginPage';
 import RegisterCustomerPage from './pages/RegisterCustomerPage';
-import RegisterProfessionalPage from './pages/RegisterProfessionalPage';
 import ProOnboardingPage, {
   type ProOnboardingFormData,
 } from './pages/ProOnboardingPage';
@@ -25,7 +24,6 @@ type Screen =
   | 'tabs'
   | 'login'
   | 'registerCustomer'
-  | 'registerProfessional'
   | 'proOnboarding'
   | 'professionalDetail'
   | 'serviceProfessionals';
@@ -1290,14 +1288,11 @@ export default function App() {
     }
 
     return (
-     <ProfilePage
-  onGoLogin={() => setScreen('login')}
-  onGoRegisterCustomer={() => setScreen('registerCustomer')}
-  onGoRegisterProfessional={() => setScreen('registerProfessional')}
-  onBackToHome={() => {
-    
-  }}
-/>
+      <ProfilePage
+        onGoLogin={() => setScreen('login')}
+        onGoRegisterCustomer={() => setScreen('registerCustomer')}
+        onGoProOnboarding={() => setScreen('proOnboarding')}
+      />
     );
   };
 
@@ -1318,49 +1313,37 @@ export default function App() {
     );
   }
 
-// 🔹 SCHERMATE SECONDARIE
+  if (screen === 'login') {
+    return (
+      <LoginPage
+        onBack={() => setScreen('tabs')}
+        onAdminLogin={() => {
+          setSessionUserId(null);
+          setUserRole('admin');
+          setScreen('tabs');
+          setTab('profile');
+          resetProfessionalWorkflowState();
+        }}
+        onLoginSuccess={bootstrapAuth}
+      />
+    );
+  }
 
-if (screen === 'login') {
-  return (
-    <LoginPage
-      onBack={() => setScreen('tabs')}
-      onAdminLogin={handleAdminLogin}
-      onLoginSuccess={() => {
-        setScreen('tabs');
-        setTab('home');
-      }}
-      onGoRegisterCustomer={() => setScreen('registerCustomer')}
-      onGoRegisterProfessional={() => setScreen('registerProfessional')}
-    />
-  );
-}
+  if (screen === 'registerCustomer') {
+    return <RegisterCustomerPage onBack={() => setScreen('tabs')} />;
+  }
 
-if (screen === 'registerCustomer') {
-  return (
-    <RegisterCustomerPage
-      onBack={() => setScreen('tabs')}
-    />
-  );
-}
-
-if (screen === 'registerProfessional') {
-  return (
-    <RegisterProfessionalPage
-      onBack={() => setScreen('tabs')}
-    />
-  );
-}
-
-if (screen === 'proOnboarding') {
-  return (
-    <ProOnboardingPage
-      isAuthenticated={role !== 'guest'}
-      onBack={() => setScreen('tabs')}
-      onGoLogin={() => setScreen('login')}
-      onSubmit={handleProfessionalOnboardingSubmit}
-    />
-  );
-}
+  if (screen === 'proOnboarding') {
+    return (
+      <ProOnboardingPage
+        isAuthenticated={userRole !== 'guest'}
+        currentUserEmail={professionalProfileData.email}
+        onBack={() => setScreen('tabs')}
+        onGoLogin={() => setScreen('login')}
+        onComplete={handleProfessionalOnboardingComplete}
+      />
+    );
+  }
 
   if (screen === 'professionalDetail') {
     return (
