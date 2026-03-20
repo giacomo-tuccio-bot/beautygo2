@@ -10,12 +10,17 @@ type AvailabilityDayKey =
   | 'saturday'
   | 'sunday';
 
+type AvailabilitySlot = {
+  id: string;
+  startTime: string;
+  endTime: string;
+};
+
 type AvailabilityDay = {
   key: AvailabilityDayKey;
   label: string;
   enabled: boolean;
-  startTime: string;
-  endTime: string;
+  slots: AvailabilitySlot[];
 };
 
 type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
@@ -90,7 +95,7 @@ export default function ProfessionalCalendarPage({
                 <div key={day.key} style={dayRow}>
                   <div style={dayLabel}>{day.label}</div>
                   <div style={dayTime}>
-                    {day.startTime} - {day.endTime}
+                    {day.slots.map((slot) => `${slot.startTime} - ${slot.endTime}`).join(' • ')}
                   </div>
                 </div>
               ))}

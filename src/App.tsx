@@ -81,12 +81,17 @@ export type AvailabilityDayKey =
   | 'saturday'
   | 'sunday';
 
+export type AvailabilitySlot = {
+  id: string;
+  startTime: string;
+  endTime: string;
+};
+
 export type AvailabilityDay = {
   key: AvailabilityDayKey;
   label: string;
   enabled: boolean;
-  startTime: string;
-  endTime: string;
+  slots: AvailabilitySlot[];
 };
 
 export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
@@ -187,14 +192,24 @@ type ProfileRecord = {
 
 const STORAGE_KEY = 'beautygo-professional-workflow-v8';
 
+const createAvailabilitySlot = (
+  startTime = '09:00',
+  endTime = '18:00',
+  id?: string
+): AvailabilitySlot => ({
+  id: id ?? `slot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  startTime,
+  endTime,
+});
+
 const defaultAvailability: AvailabilityDay[] = [
-  { key: 'monday', label: 'Lunedì', enabled: false, startTime: '09:00', endTime: '18:00' },
-  { key: 'tuesday', label: 'Martedì', enabled: false, startTime: '09:00', endTime: '18:00' },
-  { key: 'wednesday', label: 'Mercoledì', enabled: false, startTime: '09:00', endTime: '18:00' },
-  { key: 'thursday', label: 'Giovedì', enabled: false, startTime: '09:00', endTime: '18:00' },
-  { key: 'friday', label: 'Venerdì', enabled: false, startTime: '09:00', endTime: '18:00' },
-  { key: 'saturday', label: 'Sabato', enabled: false, startTime: '09:00', endTime: '18:00' },
-  { key: 'sunday', label: 'Domenica', enabled: false, startTime: '09:00', endTime: '18:00' },
+  { key: 'monday', label: 'Lunedì', enabled: false, slots: [createAvailabilitySlot()] },
+  { key: 'tuesday', label: 'Martedì', enabled: false, slots: [createAvailabilitySlot()] },
+  { key: 'wednesday', label: 'Mercoledì', enabled: false, slots: [createAvailabilitySlot()] },
+  { key: 'thursday', label: 'Giovedì', enabled: false, slots: [createAvailabilitySlot()] },
+  { key: 'friday', label: 'Venerdì', enabled: false, slots: [createAvailabilitySlot()] },
+  { key: 'saturday', label: 'Sabato', enabled: false, slots: [createAvailabilitySlot()] },
+  { key: 'sunday', label: 'Domenica', enabled: false, slots: [createAvailabilitySlot()] },
 ];
 
 const defaultRequests: ProfessionalRequest[] = [
@@ -304,6 +319,59 @@ const buildProfessionalProfileData = (
   codiceDestinatario: source?.codiceDestinatario ?? '',
 });
 
+
+const normalizeAvailability = (availability?: unknown): AvailabilityDay[] => {
+  if (!Array.isArray(availability) || availability.length === 0) {
+    return defaultAvailability;
+  }
+
+  return availability.map((day, index) => {
+    const fallback = defaultAvailability[index] ?? defaultAvailability[0];
+    const rawDay = (day ?? {}) as Partial<AvailabilityDay> & {
+      startTime?: string;
+      endTime?: string;
+      slots?: Array<Partial<AvailabilitySlot>>;
+    };
+
+    let slots: AvailabilitySlot[] = [];
+
+    if (Array.isArray(rawDay.slots) && rawDay.slots.length > 0) {
+      slots = rawDay.slots
+        .slice(0, 3)
+        .map((slot, slotIndex) =>
+          createAvailabilitySlot(
+            slot?.startTime ?? '09:00',
+            slot?.endTime ?? '18:00',
+            slot?.id ?? `${rawDay.key ?? fallback.key}-slot-${slotIndex + 1}`
+          )
+        );
+    } else if (rawDay.startTime && rawDay.endTime) {
+      slots = [
+        createAvailabilitySlot(
+          rawDay.startTime,
+          rawDay.endTime,
+          `${rawDay.key ?? fallback.key}-slot-1`
+        ),
+      ];
+    } else {
+      slots = fallback.slots.map((slot, slotIndex) =>
+        createAvailabilitySlot(
+          slot.startTime,
+          slot.endTime,
+          `${fallback.key}-slot-${slotIndex + 1}`
+        )
+      );
+    }
+
+    return {
+      key: rawDay.key ?? fallback.key,
+      label: rawDay.label ?? fallback.label,
+      enabled: Boolean(rawDay.enabled),
+      slots,
+    };
+  });
+};
+
 const getInitialPersistedState = (userId: string): PersistedAppState | null => {
   if (typeof window === 'undefined') return null;
 
@@ -331,10 +399,7 @@ const getInitialPersistedState = (userId: string): PersistedAppState | null => {
       professionalServicePrices: Array.isArray(parsed.professionalServicePrices)
         ? parsed.professionalServicePrices
         : [],
-      professionalAvailability:
-        Array.isArray(parsed.professionalAvailability) && parsed.professionalAvailability.length > 0
-          ? parsed.professionalAvailability
-          : defaultAvailability,
+      professionalAvailability: normalizeAvailability(parsed.professionalAvailability),
       availabilitySaved: Boolean(parsed.availabilitySaved),
       professionalRequests:
         Array.isArray(parsed.professionalRequests) && parsed.professionalRequests.length > 0
@@ -826,11 +891,54 @@ export default function App() {
 
   const handleAvailabilityTimeChange = (
     dayKey: AvailabilityDayKey,
+    slotId: string,
     field: 'startTime' | 'endTime',
     value: string
   ) => {
     setProfessionalAvailability((prev) =>
-      prev.map((day) => (day.key === dayKey ? { ...day, [field]: value } : day))
+      prev.map((day) =>
+        day.key === dayKey
+          ? {
+              ...day,
+              slots: day.slots.map((slot) =>
+                slot.id === slotId ? { ...slot, [field]: value } : slot
+              ),
+            }
+          : day
+      )
+    );
+    setAvailabilitySaved(false);
+  };
+
+  const handleAddAvailabilitySlot = (dayKey: AvailabilityDayKey) => {
+    setProfessionalAvailability((prev) =>
+      prev.map((day) =>
+        day.key === dayKey && day.slots.length < 3
+          ? {
+              ...day,
+              slots: [...day.slots, createAvailabilitySlot('14:00', '18:00')],
+            }
+          : day
+      )
+    );
+    setAvailabilitySaved(false);
+  };
+
+  const handleRemoveAvailabilitySlot = (dayKey: AvailabilityDayKey, slotId: string) => {
+    setProfessionalAvailability((prev) =>
+      prev.map((day) => {
+        if (day.key !== dayKey) return day;
+
+        const updatedSlots = day.slots.filter((slot) => slot.id !== slotId);
+
+        return {
+          ...day,
+          slots:
+            updatedSlots.length > 0
+              ? updatedSlots
+              : [createAvailabilitySlot('09:00', '18:00')],
+        };
+      })
     );
     setAvailabilitySaved(false);
   };
@@ -843,10 +951,29 @@ export default function App() {
       return;
     }
 
-    const hasInvalidTimeRange = activeDays.some((day) => day.startTime >= day.endTime);
+    const hasInvalidTimeRange = activeDays.some((day) =>
+      day.slots.some((slot) => slot.startTime >= slot.endTime)
+    );
 
     if (hasInvalidTimeRange) {
       alert("Controlla gli orari: l'orario di fine deve essere successivo a quello di inizio.");
+      return;
+    }
+
+    const hasOverlappingSlots = activeDays.some((day) => {
+      const sortedSlots = [...day.slots].sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+      for (let index = 1; index < sortedSlots.length; index += 1) {
+        if (sortedSlots[index].startTime < sortedSlots[index - 1].endTime) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+
+    if (hasOverlappingSlots) {
+      alert('Controlla le fasce orarie: non devono sovrapporsi nello stesso giorno.');
       return;
     }
 
@@ -1240,6 +1367,8 @@ export default function App() {
       onSavePrices={handleSavePrices}
       onToggleAvailabilityDay={handleToggleAvailabilityDay}
       onAvailabilityTimeChange={handleAvailabilityTimeChange}
+      onAddAvailabilitySlot={handleAddAvailabilitySlot}
+      onRemoveAvailabilitySlot={handleRemoveAvailabilitySlot}
       onSaveAvailability={handleSaveAvailability}
       onAcceptRequest={handleAcceptRequest}
       onRejectRequest={handleRejectRequest}

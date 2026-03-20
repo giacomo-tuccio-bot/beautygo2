@@ -10,12 +10,17 @@ type AvailabilityDayKey =
   | 'saturday'
   | 'sunday';
 
+type AvailabilitySlot = {
+  id: string;
+  startTime: string;
+  endTime: string;
+};
+
 type AvailabilityDay = {
   key: AvailabilityDayKey;
   label: string;
   enabled: boolean;
-  startTime: string;
-  endTime: string;
+  slots: AvailabilitySlot[];
 };
 
 export default function ProfessionalAvailabilityPage({
@@ -23,6 +28,8 @@ export default function ProfessionalAvailabilityPage({
   availabilitySaved,
   onToggleAvailabilityDay,
   onAvailabilityTimeChange,
+  onAddAvailabilitySlot,
+  onRemoveAvailabilitySlot,
   onSaveAvailability,
   onBack,
 }: {
@@ -31,9 +38,12 @@ export default function ProfessionalAvailabilityPage({
   onToggleAvailabilityDay: (dayKey: AvailabilityDayKey) => void;
   onAvailabilityTimeChange: (
     dayKey: AvailabilityDayKey,
+    slotId: string,
     field: 'startTime' | 'endTime',
     value: string
   ) => void;
+  onAddAvailabilitySlot: (dayKey: AvailabilityDayKey) => void;
+  onRemoveAvailabilitySlot: (dayKey: AvailabilityDayKey, slotId: string) => void;
   onSaveAvailability: () => void;
   onBack: () => void;
 }) {
@@ -69,7 +79,7 @@ export default function ProfessionalAvailabilityPage({
           lineHeight: 1.5,
         }}
       >
-        Imposta i giorni e le fasce orarie in cui il professionista è disponibile
+        Imposta i giorni e fino a 3 fasce orarie in cui il professionista è disponibile
         a ricevere richieste.
       </p>
 
@@ -85,7 +95,7 @@ export default function ProfessionalAvailabilityPage({
             <div style={statusBox}>Hai modifiche non ancora salvate</div>
           ) : (
             <div style={mutedText}>
-              Seleziona almeno un giorno lavorativo e imposta la fascia oraria.
+              Seleziona almeno un giorno lavorativo e imposta almeno una fascia oraria.
             </div>
           )}
         </div>
@@ -94,8 +104,8 @@ export default function ProfessionalAvailabilityPage({
           <div style={sectionTitle}>Giorni e orari</div>
 
           <div style={noteBox}>
-            Le richieste future verranno mostrate in base ai giorni e agli orari qui
-            configurati. Puoi aggiornare la disponibilità in qualsiasi momento.
+            Puoi impostare fino a 3 fasce orarie per ogni giorno, ad esempio 09:00-13:00,
+            14:00-16:00 e 20:00-21:00. Le fasce non devono sovrapporsi.
           </div>
 
           <div style={{ display: 'grid', gap: 14, marginTop: 16 }}>
@@ -121,60 +131,91 @@ export default function ProfessionalAvailabilityPage({
                   </div>
                 </div>
 
-                <div style={availabilityTimeGrid}>
-                  <div>
-                    <div style={timeLabel}>Inizio</div>
-                    <input
-                      type="time"
-                      value={day.startTime}
-                      disabled={!day.enabled}
-                      onChange={(e) =>
-                        onAvailabilityTimeChange(day.key, 'startTime', e.target.value)
-                      }
-                      style={{
-                        ...timeInput,
-                        opacity: day.enabled ? 1 : 0.6,
-                        cursor: day.enabled ? 'pointer' : 'not-allowed',
-                      }}
-                    />
-                  </div>
+                <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+                  {day.slots.map((slot, index) => (
+                    <div key={slot.id} style={slotCard(day.enabled)}>
+                      <div style={slotHeader}>
+                        <div style={slotTitle}>Fascia {index + 1}</div>
 
-                  <div>
-                    <div style={timeLabel}>Fine</div>
-                    <input
-                      type="time"
-                      value={day.endTime}
-                      disabled={!day.enabled}
-                      onChange={(e) =>
-                        onAvailabilityTimeChange(day.key, 'endTime', e.target.value)
-                      }
-                      style={{
-                        ...timeInput,
-                        opacity: day.enabled ? 1 : 0.6,
-                        cursor: day.enabled ? 'pointer' : 'not-allowed',
-                      }}
-                    />
-                  </div>
+                        <button
+                          onClick={() => onRemoveAvailabilitySlot(day.key, slot.id)}
+                          disabled={!day.enabled || day.slots.length === 1}
+                          style={{
+                            ...slotActionButton,
+                            opacity: !day.enabled || day.slots.length === 1 ? 0.5 : 1,
+                            cursor:
+                              !day.enabled || day.slots.length === 1 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          Rimuovi
+                        </button>
+                      </div>
+
+                      <div style={availabilityTimeGrid}>
+                        <div>
+                          <div style={timeLabel}>Inizio</div>
+                          <input
+                            type="time"
+                            value={slot.startTime}
+                            disabled={!day.enabled}
+                            onChange={(e) =>
+                              onAvailabilityTimeChange(
+                                day.key,
+                                slot.id,
+                                'startTime',
+                                e.target.value
+                              )
+                            }
+                            style={{
+                              ...timeInput,
+                              opacity: day.enabled ? 1 : 0.6,
+                              cursor: day.enabled ? 'pointer' : 'not-allowed',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={timeLabel}>Fine</div>
+                          <input
+                            type="time"
+                            value={slot.endTime}
+                            disabled={!day.enabled}
+                            onChange={(e) =>
+                              onAvailabilityTimeChange(
+                                day.key,
+                                slot.id,
+                                'endTime',
+                                e.target.value
+                              )
+                            }
+                            style={{
+                              ...timeInput,
+                              opacity: day.enabled ? 1 : 0.6,
+                              cursor: day.enabled ? 'pointer' : 'not-allowed',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={() => onAddAvailabilitySlot(day.key)}
+                    disabled={!day.enabled || day.slots.length >= 3}
+                    style={{
+                      ...secondaryButton,
+                      opacity: !day.enabled || day.slots.length >= 3 ? 0.5 : 1,
+                      cursor: !day.enabled || day.slots.length >= 3 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    + Aggiungi fascia oraria
+                  </button>
                 </div>
               </div>
             ))}
           </div>
 
-          <button
-            onClick={onSaveAvailability}
-            style={{
-              width: '100%',
-              marginTop: 18,
-              border: 'none',
-              borderRadius: 16,
-              padding: '14px 18px',
-              background: 'linear-gradient(135deg, #FF8A1F, #FF5A00)',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 16,
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={onSaveAvailability} style={primaryButton}>
             Salva disponibilità
           </button>
         </div>
@@ -244,6 +285,15 @@ function dayStatusPill(enabled: boolean): React.CSSProperties {
   };
 }
 
+function slotCard(enabled: boolean): React.CSSProperties {
+  return {
+    background: enabled ? '#FFF8F1' : '#F7F7F7',
+    borderRadius: 18,
+    padding: 14,
+    border: '1px solid #F1E5DA',
+  };
+}
+
 const card: React.CSSProperties = {
   background: '#fff',
   borderRadius: 24,
@@ -258,6 +308,24 @@ const sectionTitle: React.CSSProperties = {
   marginBottom: 12,
 };
 
+const successBox: React.CSSProperties = {
+  borderRadius: 16,
+  padding: '14px 16px',
+  background: '#EAF8EF',
+  color: '#228B4E',
+  fontSize: 14,
+  fontWeight: 700,
+};
+
+const statusBox: React.CSSProperties = {
+  borderRadius: 16,
+  padding: '14px 16px',
+  background: '#FFF3E8',
+  color: '#FF6A00',
+  fontSize: 14,
+  fontWeight: 700,
+};
+
 const mutedText: React.CSSProperties = {
   color: colors.muted,
   fontSize: 14,
@@ -265,42 +333,26 @@ const mutedText: React.CSSProperties = {
 };
 
 const noteBox: React.CSSProperties = {
-  padding: 14,
   borderRadius: 18,
+  padding: '14px 16px',
   background: '#FFF8F1',
-  border: '1px solid #F6E5D7',
   color: colors.muted,
-  fontSize: 13,
+  fontSize: 14,
   lineHeight: 1.6,
 };
 
-const statusBox: React.CSSProperties = {
-  padding: 14,
-  borderRadius: 16,
-  background: '#FFF8F1',
-  color: '#FF6A00',
-  fontWeight: 800,
-};
-
-const successBox: React.CSSProperties = {
-  padding: 14,
-  borderRadius: 16,
-  background: '#EAF8EF',
-  color: '#228B4E',
-  fontWeight: 800,
-};
-
 const availabilityCard: React.CSSProperties = {
-  background: '#FFFDFC',
-  borderRadius: 20,
+  borderRadius: 22,
   padding: 16,
-  border: '1px solid #F3E7DE',
+  background: '#fff',
+  border: '1px solid #F2E6DB',
+  boxShadow: '0 10px 24px rgba(0,0,0,0.04)',
 };
 
 const availabilityTopRow: React.CSSProperties = {
   display: 'flex',
-  justifyContent: 'space-between',
   alignItems: 'center',
+  justifyContent: 'space-between',
   gap: 12,
   flexWrap: 'wrap',
 };
@@ -308,9 +360,9 @@ const availabilityTopRow: React.CSSProperties = {
 const toggleDayButton: React.CSSProperties = {
   border: 'none',
   borderRadius: 16,
-  padding: '12px 14px',
+  padding: '12px 16px',
+  fontSize: 15,
   fontWeight: 800,
-  fontSize: 14,
   cursor: 'pointer',
 };
 
@@ -318,24 +370,68 @@ const availabilityTimeGrid: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
   gap: 12,
-  marginTop: 14,
 };
 
 const timeLabel: React.CSSProperties = {
-  color: colors.muted,
-  fontSize: 12,
+  marginBottom: 8,
+  fontSize: 13,
   fontWeight: 700,
-  marginBottom: 6,
+  color: colors.text,
 };
 
 const timeInput: React.CSSProperties = {
   width: '100%',
-  border: '1px solid #ECD9CC',
   borderRadius: 14,
+  border: '1px solid #E8D7CA',
   padding: '12px 14px',
-  background: '#fff',
+  fontSize: 15,
   color: colors.text,
-  fontSize: 14,
-  fontWeight: 700,
+  background: '#fff',
   boxSizing: 'border-box',
+};
+
+const primaryButton: React.CSSProperties = {
+  width: '100%',
+  marginTop: 18,
+  border: 'none',
+  borderRadius: 16,
+  padding: '14px 18px',
+  background: 'linear-gradient(135deg, #FF8A1F, #FF5A00)',
+  color: '#fff',
+  fontWeight: 800,
+  fontSize: 16,
+  cursor: 'pointer',
+};
+
+const secondaryButton: React.CSSProperties = {
+  width: '100%',
+  border: 'none',
+  borderRadius: 16,
+  padding: '13px 16px',
+  background: '#FFF3E8',
+  color: '#FF6A00',
+  fontWeight: 800,
+  fontSize: 14,
+};
+
+const slotHeader: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  marginBottom: 12,
+};
+
+const slotTitle: React.CSSProperties = {
+  fontSize: 14,
+  fontWeight: 800,
+  color: colors.text,
+};
+
+const slotActionButton: React.CSSProperties = {
+  border: 'none',
+  background: 'transparent',
+  color: '#FF6A00',
+  fontSize: 13,
+  fontWeight: 800,
 };

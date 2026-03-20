@@ -52,12 +52,17 @@ type AvailabilityDayKey =
   | 'saturday'
   | 'sunday';
 
+type AvailabilitySlot = {
+  id: string;
+  startTime: string;
+  endTime: string;
+};
+
 type AvailabilityDay = {
   key: AvailabilityDayKey;
   label: string;
   enabled: boolean;
-  startTime: string;
-  endTime: string;
+  slots: AvailabilitySlot[];
 };
 
 type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
@@ -237,6 +242,8 @@ export default function ProfessionalProfilePage({
   onSavePrices,
   onToggleAvailabilityDay,
   onAvailabilityTimeChange,
+  onAddAvailabilitySlot,
+  onRemoveAvailabilitySlot,
   onSaveAvailability,
   onAcceptRequest,
   onRejectRequest,
@@ -279,9 +286,12 @@ export default function ProfessionalProfilePage({
   onToggleAvailabilityDay: (dayKey: AvailabilityDayKey) => void;
   onAvailabilityTimeChange: (
     dayKey: AvailabilityDayKey,
+    slotId: string,
     field: 'startTime' | 'endTime',
     value: string
   ) => void;
+  onAddAvailabilitySlot: (dayKey: AvailabilityDayKey) => void;
+  onRemoveAvailabilitySlot: (dayKey: AvailabilityDayKey, slotId: string) => void;
   onSaveAvailability: () => void;
   onAcceptRequest: (requestId: string) => void;
   onRejectRequest: (requestId: string) => void;
@@ -792,6 +802,8 @@ export default function ProfessionalProfilePage({
         availabilitySaved={availabilitySaved}
         onToggleAvailabilityDay={onToggleAvailabilityDay}
         onAvailabilityTimeChange={onAvailabilityTimeChange}
+        onAddAvailabilitySlot={onAddAvailabilitySlot}
+        onRemoveAvailabilitySlot={onRemoveAvailabilitySlot}
         onSaveAvailability={onSaveAvailability}
         onBack={() => onOpenSection('overview')}
       />
