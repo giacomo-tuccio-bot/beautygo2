@@ -1,193 +1,105 @@
-import { colors } from '../theme';
+import React from 'react';
 
 export default function ProfilePage({
   onGoLogin,
   onGoRegisterCustomer,
   onGoRegisterProfessional,
+  onBackToHome,
 }: {
   onGoLogin: () => void;
   onGoRegisterCustomer: () => void;
   onGoRegisterProfessional: () => void;
+  onBackToHome: () => void;
 }) {
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        padding: '18px 18px 96px',
-        background:
-          'radial-gradient(circle at top left, #FFE2CC 0%, #FFF1E6 30%, #F8F2EE 75%)',
-      }}
-    >
-      <h1
-        style={{
-          margin: 0,
-          fontSize: 30,
-          fontWeight: 800,
-          color: colors.text,
-          textAlign: 'center',
-        }}
-      >
-        Profilo
-      </h1>
+  const cardStyle: React.CSSProperties = {
+    background: '#f5f5f5',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+  };
 
-      <p
-        style={{
-          color: colors.muted,
-          marginTop: 8,
-          textAlign: 'center',
-          fontSize: 15,
-          lineHeight: 1.5,
-        }}
-      >
-        Accedi con un solo account oppure scegli una registrazione dedicata come cliente o
-        professionista.
+  const primaryButton: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: 14,
+    border: 'none',
+    background: '#ff7a00',
+    color: '#fff',
+    fontWeight: 600,
+    cursor: 'pointer',
+  };
+
+  const secondaryButton: React.CSSProperties = {
+    width: '100%',
+    padding: '14px',
+    borderRadius: 14,
+    border: 'none',
+    background: '#e9ded6',
+    color: '#ff7a00',
+    fontWeight: 600,
+    cursor: 'pointer',
+  };
+
+  return (
+    <div style={{ padding: 16 }}>
+
+      {/* 🔙 BACK BUTTON */}
+      <div style={{ marginBottom: 16 }}>
+        <button
+          onClick={onBackToHome}
+          style={{
+            padding: '10px 14px',
+            borderRadius: 12,
+            border: '1px solid #ddd',
+            background: '#fff',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          ← Indietro
+        </button>
+      </div>
+
+      <h1 style={{ textAlign: 'center' }}>Profilo</h1>
+      <p style={{ textAlign: 'center', marginBottom: 20 }}>
+        Accedi con un solo account oppure scegli una registrazione dedicata come cliente o professionista.
       </p>
 
-      <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
-        <div
-          style={{
-            background: colors.card,
-            borderRadius: 28,
-            padding: 20,
-            boxShadow: colors.shadow,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 800,
-              color: colors.text,
-              textAlign: 'center',
-            }}
-          >
-            Accesso unico
-          </div>
+      {/* LOGIN */}
+      <div style={cardStyle}>
+        <h3 style={{ textAlign: 'center' }}>Accesso unico</h3>
+        <p style={{ textAlign: 'center', marginBottom: 16 }}>
+          Clienti e professionisti accedono dalla stessa pagina. Dopo il login il sistema riconosce il profilo.
+        </p>
 
-          <p
-            style={{
-              marginTop: 12,
-              marginBottom: 0,
-              color: colors.muted,
-              fontSize: 15,
-              lineHeight: 1.7,
-              textAlign: 'center',
-            }}
-          >
-            Clienti e professionisti accedono dalla stessa pagina. Dopo il login il sistema
-            riconosce il profilo associato al tuo account.
-          </p>
+        <button onClick={onGoLogin} style={primaryButton}>
+          Accedi
+        </button>
+      </div>
 
-          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            <button onClick={onGoLogin} style={primaryButton}>
-              Accedi
-            </button>
-          </div>
-        </div>
+      {/* CLIENTE */}
+      <div style={cardStyle}>
+        <h3 style={{ textAlign: 'center' }}>Registrazione cliente</h3>
+        <p style={{ textAlign: 'center', marginBottom: 16 }}>
+          Crea il tuo profilo cliente per prenotare servizi e gestire appuntamenti.
+        </p>
 
-        <div
-          style={{
-            background: colors.card,
-            borderRadius: 28,
-            padding: 20,
-            boxShadow: colors.shadow,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 800,
-              color: colors.text,
-              textAlign: 'center',
-            }}
-          >
-            Registrazione cliente
-          </div>
+        <button onClick={onGoRegisterCustomer} style={secondaryButton}>
+          Registrati come cliente
+        </button>
+      </div>
 
-          <p
-            style={{
-              marginTop: 12,
-              marginBottom: 0,
-              color: colors.muted,
-              fontSize: 15,
-              lineHeight: 1.7,
-              textAlign: 'center',
-            }}
-          >
-            Crea il tuo profilo cliente per prenotare servizi, salvare preferiti e gestire gli
-            appuntamenti.
-          </p>
+      {/* PROFESSIONISTA */}
+      <div style={cardStyle}>
+        <h3 style={{ textAlign: 'center' }}>Registrazione professionista</h3>
+        <p style={{ textAlign: 'center', marginBottom: 16 }}>
+          Registrati come professionista e completa l’onboarding dopo il login.
+        </p>
 
-          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            <button onClick={onGoRegisterCustomer} style={secondaryButton}>
-              Registrati come cliente
-            </button>
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: colors.card,
-            borderRadius: 28,
-            padding: 20,
-            boxShadow: colors.shadow,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 800,
-              color: colors.text,
-              textAlign: 'center',
-            }}
-          >
-            Registrazione professionista
-          </div>
-
-          <p
-            style={{
-              marginTop: 12,
-              marginBottom: 0,
-              color: colors.muted,
-              fontSize: 15,
-              lineHeight: 1.7,
-              textAlign: 'center',
-            }}
-          >
-            Compila una registrazione completa con dati personali, professionali e fiscali.
-            Potrai indicare in modo distinto se operi con Partita IVA o Codice Fiscale.
-          </p>
-
-          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            <button onClick={onGoRegisterProfessional} style={primaryButton}>
-              Registrati come professionista
-            </button>
-          </div>
-        </div>
+        <button onClick={onGoRegisterProfessional} style={primaryButton}>
+          Registrati come professionista
+        </button>
       </div>
     </div>
   );
 }
-
-const primaryButton: React.CSSProperties = {
-  width: '100%',
-  border: 'none',
-  borderRadius: 18,
-  padding: '15px 18px',
-  background: 'linear-gradient(135deg, #FF8A1F, #FF5A00)',
-  color: '#fff',
-  fontWeight: 800,
-  fontSize: 16,
-  cursor: 'pointer',
-};
-
-const secondaryButton: React.CSSProperties = {
-  width: '100%',
-  border: 'none',
-  borderRadius: 18,
-  padding: '15px 18px',
-  background: '#FFF3E8',
-  color: '#FF6A00',
-  fontWeight: 800,
-  fontSize: 16,
-  cursor: 'pointer',
-};
