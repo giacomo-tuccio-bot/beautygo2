@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from './lib/supabase';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -10,13 +10,13 @@ export default function AuthCallback() {
       const { data } = await supabase.auth.getSession();
 
       if (data.session) {
-        navigate("/dashboard");
+        navigate('/dashboard');
       } else {
-        navigate("/login");
+        navigate('/login');
       }
     };
 
-    handleAuth();
+    void handleAuth();
   }, [navigate]);
 
   return <div>Loading...</div>;

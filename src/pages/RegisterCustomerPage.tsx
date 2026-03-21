@@ -90,6 +90,7 @@ export default function RegisterCustomerPage({
       });
 
       if (error) {
+        await supabase.from('pending_registrations').delete().eq('email', cleanEmail);
         alert(error.message);
         return;
       }
