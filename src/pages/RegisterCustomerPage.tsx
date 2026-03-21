@@ -50,7 +50,7 @@ export default function RegisterCustomerPage({
   email: form.email,
   password: form.password,
   options: {
-    emailRedirectTo: window.location.origin,
+    emailRedirectTo: `${window.location.origin}/`,
   },
 });
 
