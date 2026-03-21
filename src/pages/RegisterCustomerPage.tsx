@@ -46,46 +46,21 @@ export default function RegisterCustomerPage({
       return;
     }
 
-    const cleanEmail = form.email.trim().toLowerCase();
-    const cleanPassword = form.password.trim();
-    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-
-    const { error: pendingError } = await supabase.from('pending_registrations').upsert(
-      {
-        email: cleanEmail,
-        role: 'customer',
-        nome: form.nome.trim(),
-        cognome: form.cognome.trim(),
-        telefono: form.telefono.trim(),
-        citta: form.citta.trim(),
-        indirizzo: form.indirizzo.trim(),
-      },
-      { onConflict: 'email' }
-    );
-
-    if (pendingError) {
-      alert(pendingError.message);
-      return;
-    }
-
     const { error } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password: cleanPassword,
-      options: {
-        emailRedirectTo: `${appUrl}/`,
-        data: {
-          role: 'customer',
-        },
-      },
-    });
+  email: form.email,
+  password: form.password,
+  options: {
+    emailRedirectTo: window.location.origin,
+  },
+});
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
+if (error) {
+  alert(error.message);
+  return;
+}
 
-    alert('Registrazione completata! Controlla la tua email per confermare l’account.');
-    onBack();
+alert('Registrazione completata! Controlla la tua email per confermare l’account.');
+onBack();
   };
 
   return (
