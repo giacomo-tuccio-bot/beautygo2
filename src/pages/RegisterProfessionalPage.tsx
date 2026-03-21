@@ -135,7 +135,7 @@ export default function RegisterProfessionalPage({
         email: cleanEmail,
         password: cleanPassword,
         options: {
-          eemailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: window.location.origin,
           data: {
             role: 'professional',
             nome: form.nome,
