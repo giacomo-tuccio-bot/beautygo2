@@ -121,52 +121,83 @@ export default function RegisterProfessionalPage({
     return true;
   };
 
-  const handleSubmit = async () => {
-    if (isSubmitting) return;
-    if (!validate()) return;
+const handleSubmit = async () => {
+  if (isSubmitting) return;
+  if (!validate()) return;
 
-    setIsSubmitting(true);
+  setIsSubmitting(true);
 
-    const cleanEmail = form.email.trim().toLowerCase();
-    const cleanPassword = form.password.trim();
+  const cleanEmail = form.email.trim().toLowerCase();
+  const cleanPassword = form.password.trim();
+  const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password: cleanPassword,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: {
-            role: 'professional',
-            nome: form.nome,
-            cognome: form.cognome,
-            telefono: form.telefono,
-            citta: form.citta,
-            indirizzo: form.indirizzo,
-          },
-        },
-      });
+  try {
+    const { error: pendingError } = await supabase.from('pending_registrations').insert({
+      email: cleanEmail,
+      role: 'professional',
+      nome: form.nome.trim(),
+      cognome: form.cognome.trim(),
+      telefono: form.telefono.trim(),
+      citta: form.citta.trim(),
+      indirizzo: form.indirizzo.trim(),
+      tipoDocumentoFiscale: form.tipoDocumentoFiscale,
+      valoreDocumentoFiscale: form.valoreDocumentoFiscale.trim(),
+      intestatarioFatturazione: form.intestatarioFatturazione.trim(),
+      ragioneSociale: form.ragioneSociale.trim(),
+      codiceFiscaleFatturazione: form.codiceFiscaleFatturazione.trim(),
+      partitaIvaFatturazione: form.partitaIvaFatturazione.trim(),
+      indirizzoFatturazione: form.indirizzoFatturazione.trim(),
+      cittaFatturazione: form.cittaFatturazione.trim(),
+      capFatturazione: form.capFatturazione.trim(),
+      provinciaFatturazione: form.provinciaFatturazione.trim(),
+      pec: form.pec.trim(),
+      codiceDestinatario: form.codiceDestinatario.trim(),
+    });
 
-      if (error) {
-        alert(error.message);
-        return;
+    if (pendingError) {
+      const message = String(pendingError.message || '').toLowerCase();
+
+      if (message.includes('duplicate key')) {
+        alert(
+          'Esiste già una registrazione in attesa per questa email. Controlla la tua email di conferma oppure elimina la riga corrispondente in pending_registrations su Supabase e riprova.'
+        );
+      } else {
+        alert(pendingError.message);
       }
 
-      console.log('Signup professionista riuscito:', data);
-
-      alert('Registrazione completata! Controlla la tua email per confermare l’account.');
-      onGoLogin();
-    } catch (error: any) {
-      console.error('Errore durante la registrazione professionista:', error);
-      alert(
-        `Errore durante la registrazione professionista: ${
-          error?.message || JSON.stringify(error) || 'errore sconosciuto'
-        }`
-      );
-    } finally {
-      setIsSubmitting(false);
+      return;
     }
-  };
+
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password: cleanPassword,
+      options: {
+        emailRedirectTo: `${appUrl}/`,
+        data: {
+          role: 'professional',
+        },
+      },
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    console.log('Signup professionista riuscito:', data);
+    alert('Registrazione completata! Controlla la tua email per confermare l’account.');
+    onGoLogin();
+  } catch (error: any) {
+    console.error('Errore durante la registrazione professionista:', error);
+    alert(
+      `Errore durante la registrazione professionista: ${
+        error?.message || JSON.stringify(error) || 'errore sconosciuto'
+      }`
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div

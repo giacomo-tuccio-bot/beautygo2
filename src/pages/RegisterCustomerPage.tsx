@@ -35,33 +35,64 @@ export default function RegisterCustomerPage({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmit = async () => {
-    if (
-      !form.nome.trim() ||
-      !form.cognome.trim() ||
-      !form.email.trim() ||
-      !form.password.trim()
-    ) {
-      alert('Compila almeno nome, cognome, email e password.');
-      return;
+const handleSubmit = async () => {
+  if (
+    !form.nome.trim() ||
+    !form.cognome.trim() ||
+    !form.email.trim() ||
+    !form.password.trim()
+  ) {
+    alert('Compila almeno nome, cognome, email e password.');
+    return;
+  }
+
+  const cleanEmail = form.email.trim().toLowerCase();
+  const cleanPassword = form.password.trim();
+  const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+
+  const { error: pendingError } = await supabase.from('pending_registrations').insert({
+    email: cleanEmail,
+    role: 'customer',
+    nome: form.nome.trim(),
+    cognome: form.cognome.trim(),
+    telefono: form.telefono.trim(),
+    citta: form.citta.trim(),
+    indirizzo: form.indirizzo.trim(),
+  });
+
+  if (pendingError) {
+    const message = String(pendingError.message || '').toLowerCase();
+
+    if (message.includes('duplicate key')) {
+      alert(
+        'Esiste già una registrazione in attesa per questa email. Controlla la tua email di conferma oppure elimina la riga corrispondente in pending_registrations su Supabase e riprova.'
+      );
+    } else {
+      alert(pendingError.message);
     }
 
-    const { error } = await supabase.auth.signUp({
-  email: form.email,
-  password: form.password,
-  options: {
-    emailRedirectTo: window.location.origin,
-  },
-});
+    return;
+  }
 
-if (error) {
-  alert(error.message);
-  return;
-}
+  const { error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password: cleanPassword,
+    options: {
+      emailRedirectTo: `${appUrl}/`,
+      data: {
+        role: 'customer',
+      },
+    },
+  });
 
-alert('Registrazione completata! Controlla la tua email per confermare l’account.');
-onBack();
-  };
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert('Registrazione completata! Controlla la tua email per confermare l’account.');
+  onBack();
+};
 
   return (
     <div

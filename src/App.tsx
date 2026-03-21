@@ -623,55 +623,116 @@ export default function App() {
     }
   };
 
-  const fetchOrCreateProfile = async (
-    user: User
-  ): Promise<{ role: UserRole; profile: ProfileRecord | null }> => {
-    const { data, error } = await supabase
-      .from('profiles')
+const fetchOrCreateProfile = async (
+  user: User
+): Promise<{ role: UserRole; profile: ProfileRecord | null }> => {
+  const email = user.email?.trim().toLowerCase() ?? '';
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    const { data: pending, error: pendingError } = await supabase
+      .from('pending_registrations')
       .select('*')
-      .eq('id', user.id)
+      .eq('email', email)
       .maybeSingle();
 
-    if (error) {
-      throw error;
+    if (pendingError) {
+      throw pendingError;
     }
 
-    if (!data) {
+    if (pending) {
       const createdProfile: ProfileRecord = {
         id: user.id,
-        email: user.email ?? '',
-        role: 'customer',
+        email,
+        role: pending.role ?? (user.user_metadata?.role ?? 'customer'),
+        nome: pending.nome ?? '',
+        cognome: pending.cognome ?? '',
+        telefono: pending.telefono ?? '',
+        citta: pending.citta ?? '',
+        indirizzo: pending.indirizzo ?? '',
+        tipoDocumentoFiscale: pending.tipoDocumentoFiscale ?? 'piva',
+        valoreDocumentoFiscale: pending.valoreDocumentoFiscale ?? '',
+        intestatarioFatturazione: pending.intestatarioFatturazione ?? '',
+        ragioneSociale: pending.ragioneSociale ?? '',
+        codiceFiscaleFatturazione: pending.codiceFiscaleFatturazione ?? '',
+        partitaIvaFatturazione: pending.partitaIvaFatturazione ?? '',
+        indirizzoFatturazione: pending.indirizzoFatturazione ?? '',
+        cittaFatturazione: pending.cittaFatturazione ?? '',
+        capFatturazione: pending.capFatturazione ?? '',
+        provinciaFatturazione: pending.provinciaFatturazione ?? '',
+        pec: pending.pec ?? '',
+        codiceDestinatario: pending.codiceDestinatario ?? '',
       };
 
-      await upsertProfileSafely(createdProfile, 'customer');
+      const pendingRole = createdProfile.role === 'professional' ? 'professional' : 'customer';
+      await upsertProfileSafely(createdProfile, pendingRole);
+
+      const { error: deletePendingError } = await supabase
+        .from('pending_registrations')
+        .delete()
+        .eq('email', email);
+
+      if (deletePendingError) {
+        console.warn('Impossibile eliminare pending_registrations:', deletePendingError);
+      }
 
       return {
-        role: 'customer',
+        role: pendingRole,
         profile: createdProfile,
       };
     }
 
-    let normalizedRole: UserRole = 'customer';
+    const fallbackRole =
+      user.user_metadata?.role === 'professional'
+        ? 'professional'
+        : user.user_metadata?.role === 'admin'
+        ? 'admin'
+        : 'customer';
 
-    if (data.role === 'professional') normalizedRole = 'professional';
-    else if (data.role === 'admin') normalizedRole = 'admin';
-    else if (data.role === 'customer') normalizedRole = 'customer';
-    else {
-      await upsertProfileSafely(
-        {
-          id: user.id,
-          email: data.email ?? user.email ?? '',
-          role: 'customer',
-        },
-        'customer'
-      );
-    }
+    const createdProfile: ProfileRecord = {
+      id: user.id,
+      email,
+      role: fallbackRole,
+    };
+
+    await upsertProfileSafely(createdProfile, fallbackRole);
 
     return {
-      role: normalizedRole,
-      profile: data as ProfileRecord,
+      role: fallbackRole,
+      profile: createdProfile,
     };
+  }
+
+  let normalizedRole: UserRole = 'customer';
+
+  if (data.role === 'professional') normalizedRole = 'professional';
+  else if (data.role === 'admin') normalizedRole = 'admin';
+  else if (data.role === 'customer') normalizedRole = 'customer';
+  else {
+    await upsertProfileSafely(
+      {
+        id: user.id,
+        email: data.email ?? email,
+        role: 'customer',
+      },
+      'customer'
+    );
+  }
+
+  return {
+    role: normalizedRole,
+    profile: data as ProfileRecord,
   };
+};
 
   const applyGuestState = () => {
     setSessionUserId(null);
