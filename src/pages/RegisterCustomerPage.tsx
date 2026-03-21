@@ -7,7 +7,6 @@ export default function RegisterCustomerPage({
 }: {
   onBack: () => void;
 }) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     nome: '',
     cognome: '',
@@ -17,6 +16,8 @@ export default function RegisterCustomerPage({
     citta: '',
     indirizzo: '',
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -36,75 +37,75 @@ export default function RegisterCustomerPage({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-const handleSubmit = async () => {
-  if (isSubmitting) return;
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
 
-  if (
-    !form.nome.trim() ||
-    !form.cognome.trim() ||
-    !form.email.trim() ||
-    !form.password.trim()
-  ) {
-    alert('Compila almeno nome, cognome, email e password.');
-    return;
-  }
+    if (
+      !form.nome.trim() ||
+      !form.cognome.trim() ||
+      !form.email.trim() ||
+      !form.password.trim()
+    ) {
+      alert('Compila almeno nome, cognome, email e password.');
+      return;
+    }
 
-  setIsSubmitting(true);
+    setIsSubmitting(true);
 
-  const cleanEmail = form.email.trim().toLowerCase();
-  const cleanPassword = form.password.trim();
-  const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const cleanEmail = form.email.trim().toLowerCase();
+    const cleanPassword = form.password.trim();
+    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
 
-  try {
-    const { error: pendingError } = await supabase.from('pending_registrations').insert({
-      email: cleanEmail,
-      role: 'customer',
-      nome: form.nome.trim(),
-      cognome: form.cognome.trim(),
-      telefono: form.telefono.trim(),
-      citta: form.citta.trim(),
-      indirizzo: form.indirizzo.trim(),
-    });
+    try {
+      const { error: pendingError } = await supabase.from('pending_registrations').insert({
+        email: cleanEmail,
+        role: 'customer',
+        nome: form.nome.trim(),
+        cognome: form.cognome.trim(),
+        telefono: form.telefono.trim(),
+        citta: form.citta.trim(),
+        indirizzo: form.indirizzo.trim(),
+      });
 
-    if (pendingError) {
-      if ((pendingError.message || '').toLowerCase().includes('duplicate key')) {
-        alert(
-          'Esiste già una registrazione in attesa per questa email. Conferma la mail già ricevuta oppure elimina la riga da pending_registrations e riprova.'
-        );
-      } else {
-        alert(pendingError.message);
+      if (pendingError) {
+        if ((pendingError.message || '').toLowerCase().includes('duplicate key')) {
+          alert(
+            'Esiste già una registrazione in attesa per questa email. Conferma la mail già ricevuta oppure elimina la riga da pending_registrations e riprova.'
+          );
+        } else {
+          alert(pendingError.message);
+        }
+        return;
       }
-      return;
-    }
 
-    const { error } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password: cleanPassword,
-      options: {
-        emailRedirectTo: `${appUrl}/`,
-        data: {
-          role: 'customer',
+      const { error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: cleanPassword,
+        options: {
+          emailRedirectTo: `${appUrl}/`,
+          data: {
+            role: 'customer',
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      alert(error.message);
-      return;
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      alert('Registrazione completata! Controlla la tua email per confermare l’account.');
+      onBack();
+    } catch (error: any) {
+      alert(
+        `Errore durante la registrazione cliente: ${
+          error?.message || JSON.stringify(error) || 'errore sconosciuto'
+        }`
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-
-    alert('Registrazione completata! Controlla la tua email per confermare l’account.');
-    onBack();
-  } catch (error: any) {
-    alert(
-      `Errore durante la registrazione cliente: ${
-        error?.message || JSON.stringify(error) || 'errore sconosciuto'
-      }`
-    );
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   return (
     <div
@@ -207,7 +208,7 @@ const handleSubmit = async () => {
             cursor: 'pointer',
           }}
         >
-          Registrati
+          {isSubmitting ? 'Invio in corso...' : 'Registrati'}
         </button>
       </div>
 
