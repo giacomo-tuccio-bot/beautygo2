@@ -131,18 +131,45 @@ export default function RegisterProfessionalPage({
     const cleanPassword = form.password.trim();
 
     try {
+      const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+
+      const { error: pendingError } = await supabase.from('pending_registrations').upsert(
+        {
+          email: cleanEmail,
+          role: 'professional',
+          nome: form.nome.trim(),
+          cognome: form.cognome.trim(),
+          telefono: form.telefono.trim(),
+          citta: form.citta.trim(),
+          indirizzo: form.indirizzo.trim(),
+          tipoDocumentoFiscale: form.tipoDocumentoFiscale,
+          valoreDocumentoFiscale: form.valoreDocumentoFiscale.trim(),
+          intestatarioFatturazione: form.intestatarioFatturazione.trim(),
+          ragioneSociale: form.ragioneSociale.trim(),
+          codiceFiscaleFatturazione: form.codiceFiscaleFatturazione.trim(),
+          partitaIvaFatturazione: form.partitaIvaFatturazione.trim(),
+          indirizzoFatturazione: form.indirizzoFatturazione.trim(),
+          cittaFatturazione: form.cittaFatturazione.trim(),
+          capFatturazione: form.capFatturazione.trim(),
+          provinciaFatturazione: form.provinciaFatturazione.trim(),
+          pec: form.pec.trim(),
+          codiceDestinatario: form.codiceDestinatario.trim(),
+        },
+        { onConflict: 'email' }
+      );
+
+      if (pendingError) {
+        alert(pendingError.message);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password: cleanPassword,
         options: {
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: `${appUrl}/`,
           data: {
             role: 'professional',
-            nome: form.nome,
-            cognome: form.cognome,
-            telefono: form.telefono,
-            citta: form.citta,
-            indirizzo: form.indirizzo,
           },
         },
       });

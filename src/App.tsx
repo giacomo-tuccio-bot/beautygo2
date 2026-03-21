@@ -190,6 +190,28 @@ type ProfileRecord = {
   codiceDestinatario?: string | null;
 };
 
+type PendingRegistrationRecord = {
+  email?: string | null;
+  role?: string | null;
+  nome?: string | null;
+  cognome?: string | null;
+  telefono?: string | null;
+  citta?: string | null;
+  indirizzo?: string | null;
+  tipoDocumentoFiscale?: string | null;
+  valoreDocumentoFiscale?: string | null;
+  intestatarioFatturazione?: string | null;
+  ragioneSociale?: string | null;
+  codiceFiscaleFatturazione?: string | null;
+  partitaIvaFatturazione?: string | null;
+  indirizzoFatturazione?: string | null;
+  cittaFatturazione?: string | null;
+  capFatturazione?: string | null;
+  provinciaFatturazione?: string | null;
+  pec?: string | null;
+  codiceDestinatario?: string | null;
+};
+
 const STORAGE_KEY = 'beautygo-professional-workflow-v8';
 
 const createAvailabilitySlot = (
@@ -626,6 +648,8 @@ export default function App() {
   const fetchOrCreateProfile = async (
     user: User
   ): Promise<{ role: UserRole; profile: ProfileRecord | null }> => {
+    const normalizedEmail = user.email?.trim().toLowerCase() ?? '';
+
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -636,40 +660,98 @@ export default function App() {
       throw error;
     }
 
-    if (!data) {
-      const createdProfile: ProfileRecord = {
-        id: user.id,
-        email: user.email ?? '',
-        role: 'customer',
-      };
+    if (data) {
+      let normalizedRole: UserRole = 'customer';
 
-      await upsertProfileSafely(createdProfile, 'customer');
+      if (data.role === 'professional') normalizedRole = 'professional';
+      else if (data.role === 'admin') normalizedRole = 'admin';
+      else if (data.role === 'customer') normalizedRole = 'customer';
+      else {
+        await upsertProfileSafely(
+          {
+            id: user.id,
+            email: data.email ?? normalizedEmail,
+            role: 'customer',
+          },
+          'customer'
+        );
+      }
 
       return {
-        role: 'customer',
+        role: normalizedRole,
+        profile: data as ProfileRecord,
+      };
+    }
+
+    const { data: pending, error: pendingError } = await supabase
+      .from('pending_registrations')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    if (pendingError) {
+      throw pendingError;
+    }
+
+    if (pending) {
+      const pendingProfile = pending as PendingRegistrationRecord;
+      const createdProfile: ProfileRecord = {
+        id: user.id,
+        email: normalizedEmail,
+        role: pendingProfile.role === 'professional' ? 'professional' : 'customer',
+        nome: pendingProfile.nome ?? '',
+        cognome: pendingProfile.cognome ?? '',
+        telefono: pendingProfile.telefono ?? '',
+        citta: pendingProfile.citta ?? '',
+        indirizzo: pendingProfile.indirizzo ?? '',
+        tipoDocumentoFiscale: pendingProfile.tipoDocumentoFiscale ?? '',
+        valoreDocumentoFiscale: pendingProfile.valoreDocumentoFiscale ?? '',
+        intestatarioFatturazione: pendingProfile.intestatarioFatturazione ?? '',
+        ragioneSociale: pendingProfile.ragioneSociale ?? '',
+        codiceFiscaleFatturazione: pendingProfile.codiceFiscaleFatturazione ?? '',
+        partitaIvaFatturazione: pendingProfile.partitaIvaFatturazione ?? '',
+        indirizzoFatturazione: pendingProfile.indirizzoFatturazione ?? '',
+        cittaFatturazione: pendingProfile.cittaFatturazione ?? '',
+        capFatturazione: pendingProfile.capFatturazione ?? '',
+        provinciaFatturazione: pendingProfile.provinciaFatturazione ?? '',
+        pec: pendingProfile.pec ?? '',
+        codiceDestinatario: pendingProfile.codiceDestinatario ?? '',
+      };
+
+      await upsertProfileSafely(
+        createdProfile,
+        createdProfile.role === 'professional' ? 'professional' : 'customer'
+      );
+
+      const { error: deletePendingError } = await supabase
+        .from('pending_registrations')
+        .delete()
+        .eq('email', normalizedEmail);
+
+      if (deletePendingError) {
+        console.error('Errore eliminazione pending registration:', deletePendingError);
+      }
+
+      return {
+        role: createdProfile.role === 'professional' ? 'professional' : 'customer',
         profile: createdProfile,
       };
     }
 
-    let normalizedRole: UserRole = 'customer';
+    const fallbackRole: UserRole =
+      user.user_metadata?.role === 'professional' ? 'professional' : 'customer';
 
-    if (data.role === 'professional') normalizedRole = 'professional';
-    else if (data.role === 'admin') normalizedRole = 'admin';
-    else if (data.role === 'customer') normalizedRole = 'customer';
-    else {
-      await upsertProfileSafely(
-        {
-          id: user.id,
-          email: data.email ?? user.email ?? '',
-          role: 'customer',
-        },
-        'customer'
-      );
-    }
+    const createdProfile: ProfileRecord = {
+      id: user.id,
+      email: normalizedEmail,
+      role: fallbackRole,
+    };
+
+    await upsertProfileSafely(createdProfile, fallbackRole);
 
     return {
-      role: normalizedRole,
-      profile: data as ProfileRecord,
+      role: fallbackRole,
+      profile: createdProfile,
     };
   };
 
