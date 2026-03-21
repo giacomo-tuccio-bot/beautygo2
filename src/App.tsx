@@ -626,7 +626,7 @@ export default function App() {
 const fetchOrCreateProfile = async (
   user: User
 ): Promise<{ role: UserRole; profile: ProfileRecord | null }> => {
-  const email = user.email?.trim().toLowerCase() ?? '';
+  const email = (user.email ?? '').trim().toLowerCase();
 
   const { data, error } = await supabase
     .from('profiles')
@@ -638,99 +638,107 @@ const fetchOrCreateProfile = async (
     throw error;
   }
 
-  if (!data) {
-    const { data: pending, error: pendingError } = await supabase
-      .from('pending_registrations')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
+  if (data) {
+    let normalizedRole: UserRole = 'customer';
 
-    if (pendingError) {
-      throw pendingError;
+    if (data.role === 'professional') normalizedRole = 'professional';
+    else if (data.role === 'admin') normalizedRole = 'admin';
+    else if (data.role === 'customer') normalizedRole = 'customer';
+    else {
+      const fallbackRole =
+        user.user_metadata?.role === 'professional'
+          ? 'professional'
+          : user.user_metadata?.role === 'admin'
+          ? 'admin'
+          : 'customer';
+
+      await upsertProfileSafely(
+        {
+          id: user.id,
+          email: data.email ?? email,
+          role: fallbackRole,
+        },
+        fallbackRole
+      );
+
+      normalizedRole = fallbackRole;
     }
-
-    if (pending) {
-      const createdProfile: ProfileRecord = {
-        id: user.id,
-        email,
-        role: pending.role ?? (user.user_metadata?.role ?? 'customer'),
-        nome: pending.nome ?? '',
-        cognome: pending.cognome ?? '',
-        telefono: pending.telefono ?? '',
-        citta: pending.citta ?? '',
-        indirizzo: pending.indirizzo ?? '',
-        tipoDocumentoFiscale: pending.tipoDocumentoFiscale ?? 'piva',
-        valoreDocumentoFiscale: pending.valoreDocumentoFiscale ?? '',
-        intestatarioFatturazione: pending.intestatarioFatturazione ?? '',
-        ragioneSociale: pending.ragioneSociale ?? '',
-        codiceFiscaleFatturazione: pending.codiceFiscaleFatturazione ?? '',
-        partitaIvaFatturazione: pending.partitaIvaFatturazione ?? '',
-        indirizzoFatturazione: pending.indirizzoFatturazione ?? '',
-        cittaFatturazione: pending.cittaFatturazione ?? '',
-        capFatturazione: pending.capFatturazione ?? '',
-        provinciaFatturazione: pending.provinciaFatturazione ?? '',
-        pec: pending.pec ?? '',
-        codiceDestinatario: pending.codiceDestinatario ?? '',
-      };
-
-      const pendingRole = createdProfile.role === 'professional' ? 'professional' : 'customer';
-      await upsertProfileSafely(createdProfile, pendingRole);
-
-      const { error: deletePendingError } = await supabase
-        .from('pending_registrations')
-        .delete()
-        .eq('email', email);
-
-      if (deletePendingError) {
-        console.warn('Impossibile eliminare pending_registrations:', deletePendingError);
-      }
-
-      return {
-        role: pendingRole,
-        profile: createdProfile,
-      };
-    }
-
-    const fallbackRole =
-      user.user_metadata?.role === 'professional'
-        ? 'professional'
-        : user.user_metadata?.role === 'admin'
-        ? 'admin'
-        : 'customer';
-
-    const createdProfile: ProfileRecord = {
-      id: user.id,
-      email,
-      role: fallbackRole,
-    };
-
-    await upsertProfileSafely(createdProfile, fallbackRole);
 
     return {
-      role: fallbackRole,
-      profile: createdProfile,
+      role: normalizedRole,
+      profile: data as ProfileRecord,
     };
   }
 
-  let normalizedRole: UserRole = 'customer';
+  const { data: pending, error: pendingError } = await supabase
+    .from('pending_registrations')
+    .select('*')
+    .eq('email', email)
+    .maybeSingle();
 
-  if (data.role === 'professional') normalizedRole = 'professional';
-  else if (data.role === 'admin') normalizedRole = 'admin';
-  else if (data.role === 'customer') normalizedRole = 'customer';
-  else {
-    await upsertProfileSafely(
-      {
-        id: user.id,
-        email: data.email ?? email,
-        role: 'customer',
-      },
-      'customer'
-    );
+  if (pendingError) {
+    console.error('Errore lettura pending_registrations:', pendingError);
+  }
+
+  const pendingRole =
+    pending?.role === 'professional'
+      ? 'professional'
+      : pending?.role === 'admin'
+      ? 'admin'
+      : pending?.role === 'customer'
+      ? 'customer'
+      : null;
+
+  const metadataRole =
+    user.user_metadata?.role === 'professional'
+      ? 'professional'
+      : user.user_metadata?.role === 'admin'
+      ? 'admin'
+      : user.user_metadata?.role === 'customer'
+      ? 'customer'
+      : null;
+
+  const resolvedRole: UserRole = (pendingRole ?? metadataRole ?? 'customer') as UserRole;
+
+  const createdProfile: ProfileRecord = {
+    id: user.id,
+    email,
+    role: resolvedRole,
+    nome: pending?.nome ?? null,
+    cognome: pending?.cognome ?? null,
+    telefono: pending?.telefono ?? null,
+    citta: pending?.citta ?? null,
+    indirizzo: pending?.indirizzo ?? null,
+    tipoDocumentoFiscale: pending?.tipoDocumentoFiscale ?? null,
+    valoreDocumentoFiscale: pending?.valoreDocumentoFiscale ?? null,
+    intestatarioFatturazione: pending?.intestatarioFatturazione ?? null,
+    ragioneSociale: pending?.ragioneSociale ?? null,
+    codiceFiscaleFatturazione: pending?.codiceFiscaleFatturazione ?? null,
+    partitaIvaFatturazione: pending?.partitaIvaFatturazione ?? null,
+    indirizzoFatturazione: pending?.indirizzoFatturazione ?? null,
+    cittaFatturazione: pending?.cittaFatturazione ?? null,
+    capFatturazione: pending?.capFatturazione ?? null,
+    provinciaFatturazione: pending?.provinciaFatturazione ?? null,
+    pec: pending?.pec ?? null,
+    codiceDestinatario: pending?.codiceDestinatario ?? null,
+  };
+
+  await upsertProfileSafely(createdProfile, resolvedRole);
+
+  if (pending?.email) {
+    const { error: deletePendingError } = await supabase
+      .from('pending_registrations')
+      .delete()
+      .eq('email', email);
+
+    if (deletePendingError) {
+      console.error('Errore cancellazione pending_registrations:', deletePendingError);
+    }
   }
 
   return {
-    role: normalizedRole,
-    profile: data as ProfileRecord,
+    role: resolvedRole,
+    profile: createdProfile,
   };
 };
 

@@ -155,16 +155,13 @@ const handleSubmit = async () => {
     });
 
     if (pendingError) {
-      const message = String(pendingError.message || '').toLowerCase();
-
-      if (message.includes('duplicate key')) {
+      if ((pendingError.message || '').toLowerCase().includes('duplicate key')) {
         alert(
-          'Esiste già una registrazione in attesa per questa email. Controlla la tua email di conferma oppure elimina la riga corrispondente in pending_registrations su Supabase e riprova.'
+          'Esiste già una registrazione in attesa per questa email. Conferma la mail già ricevuta oppure elimina la riga da pending_registrations e riprova.'
         );
       } else {
         alert(pendingError.message);
       }
-
       return;
     }
 
@@ -185,6 +182,7 @@ const handleSubmit = async () => {
     }
 
     console.log('Signup professionista riuscito:', data);
+
     alert('Registrazione completata! Controlla la tua email per confermare l’account.');
     onGoLogin();
   } catch (error: any) {
@@ -199,7 +197,7 @@ const handleSubmit = async () => {
   }
 };
 
-  return (
+return (  return (
     <div
       style={{
         minHeight: '100vh',
