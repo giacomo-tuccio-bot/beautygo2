@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { colors } from '../theme';
 
 export type ProOnboardingFormData = {
@@ -8,6 +9,7 @@ export type ProOnboardingFormData = {
   telefono: string;
   citta: string;
   indirizzo: string;
+  bio: string;
   tipoDocumentoFiscale: string;
   valoreDocumentoFiscale: string;
   intestatarioFatturazione: string;
@@ -33,7 +35,7 @@ export default function ProOnboardingPage({
   currentUserEmail?: string;
   onBack: () => void;
   onGoLogin: () => void;
-  onComplete: (data: ProOnboardingFormData) => void | Promise<void>;
+  onComplete?: (data: ProOnboardingFormData) => void | Promise<void>;
 }) {
   const [form, setForm] = useState<ProOnboardingFormData>({
     nome: '',
@@ -42,6 +44,7 @@ export default function ProOnboardingPage({
     telefono: '',
     citta: '',
     indirizzo: '',
+    bio: '',
     tipoDocumentoFiscale: 'piva',
     valoreDocumentoFiscale: '',
     intestatarioFatturazione: '',
@@ -55,7 +58,9 @@ export default function ProOnboardingPage({
     pec: '',
     codiceDestinatario: '',
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -71,6 +76,14 @@ export default function ProOnboardingPage({
     color: colors.text,
   };
 
+  const textAreaStyle: React.CSSProperties = {
+    ...inputStyle,
+    minHeight: 110,
+    height: 110,
+    padding: '14px',
+    resize: 'vertical',
+  };
+
   const fiscalLabel = useMemo(
     () =>
       form.tipoDocumentoFiscale === 'piva'
@@ -82,6 +95,62 @@ export default function ProOnboardingPage({
   const handleChange = (key: keyof ProOnboardingFormData, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!isAuthenticated) return;
+
+      setIsLoadingProfile(true);
+
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profileError || !profile) {
+          return;
+        }
+
+        setForm((prev) => ({
+          ...prev,
+          nome: profile.nome ?? '',
+          cognome: profile.cognome ?? '',
+          email: profile.email ?? user.email ?? currentUserEmail ?? '',
+          telefono: profile.telefono ?? '',
+          citta: profile.citta ?? '',
+          indirizzo: profile.indirizzo ?? '',
+          bio: profile.bio ?? '',
+          tipoDocumentoFiscale: profile.tipoDocumentoFiscale ?? 'piva',
+          valoreDocumentoFiscale: profile.valoreDocumentoFiscale ?? '',
+          intestatarioFatturazione: profile.intestatarioFatturazione ?? '',
+          ragioneSociale: profile.ragioneSociale ?? '',
+          codiceFiscaleFatturazione: profile.codiceFiscaleFatturazione ?? '',
+          partitaIvaFatturazione: profile.partitaIvaFatturazione ?? '',
+          indirizzoFatturazione: profile.indirizzoFatturazione ?? '',
+          cittaFatturazione: profile.cittaFatturazione ?? '',
+          capFatturazione: profile.capFatturazione ?? '',
+          provinciaFatturazione: profile.provinciaFatturazione ?? '',
+          pec: profile.pec ?? '',
+          codiceDestinatario: profile.codiceDestinatario ?? '',
+        }));
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    void loadProfile();
+  }, [isAuthenticated, currentUserEmail]);
 
   const validateForm = () => {
     if (!form.nome.trim() || !form.cognome.trim() || !form.email.trim()) {
@@ -99,24 +168,92 @@ export default function ProOnboardingPage({
       return false;
     }
 
+    if (!form.bio.trim()) {
+      alert('Inserisci una breve bio professionale.');
+      return false;
+    }
+
     return true;
   };
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+
     if (!isAuthenticated) {
       alert('Devi prima fare login.');
       return;
     }
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
 
     try {
-      await onComplete({
-        ...form,
-        email: form.email.trim().toLowerCase(),
-      });
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        alert('Utente non trovato. Effettua di nuovo il login.');
+        return;
+      }
+
+      const cleanEmail = form.email.trim().toLowerCase();
+      const hasVat = form.tipoDocumentoFiscale === 'piva';
+
+      const payload = {
+        email: cleanEmail,
+        role: 'professional',
+        nome: form.nome.trim(),
+        cognome: form.cognome.trim(),
+        telefono: form.telefono.trim(),
+        citta: form.citta.trim(),
+        indirizzo: form.indirizzo.trim(),
+        bio: form.bio.trim(),
+        tipoDocumentoFiscale: form.tipoDocumentoFiscale,
+        valoreDocumentoFiscale: form.valoreDocumentoFiscale.trim(),
+        intestatarioFatturazione: form.intestatarioFatturazione.trim(),
+        ragioneSociale: form.ragioneSociale.trim(),
+        codiceFiscaleFatturazione: form.codiceFiscaleFatturazione.trim(),
+        partitaIvaFatturazione: form.partitaIvaFatturazione.trim(),
+        indirizzoFatturazione: form.indirizzoFatturazione.trim(),
+        cittaFatturazione: form.cittaFatturazione.trim(),
+        capFatturazione: form.capFatturazione.trim(),
+        provinciaFatturazione: form.provinciaFatturazione.trim(),
+        pec: form.pec.trim(),
+        codiceDestinatario: form.codiceDestinatario.trim(),
+        has_vat: hasVat,
+        vat_rate: hasVat ? 22 : 0,
+        onboarding_completed: true,
+        professional_status: 'submitted',
+        submitted_at: new Date().toISOString(),
+      };
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', user.id);
+
+      if (updateError) {
+        alert(updateError.message);
+        return;
+      }
+
+      if (onComplete) {
+        await onComplete({
+          ...form,
+          email: cleanEmail,
+        });
+      }
+
+      alert('Onboarding completato. Il tuo profilo è stato inviato per approvazione.');
+    } catch (error: any) {
+      alert(
+        `Errore durante il salvataggio dell'onboarding: ${
+          error?.message || 'errore sconosciuto'
+        }`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -218,7 +355,7 @@ export default function ProOnboardingPage({
           lineHeight: 1.5,
         }}
       >
-        Questo step aggiorna il tuo profilo esistente e ti abilita alla dashboard professionista.
+        Completa il tuo profilo professionale e invialo per approvazione.
       </p>
 
       <div
@@ -230,6 +367,21 @@ export default function ProOnboardingPage({
           boxShadow: colors.shadow,
         }}
       >
+        {isLoadingProfile && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 12,
+              borderRadius: 14,
+              background: '#FFF8F1',
+              color: colors.muted,
+              fontSize: 13,
+            }}
+          >
+            Caricamento dati profilo...
+          </div>
+        )}
+
         <div style={sectionTitle}>Dati anagrafici e contatti</div>
 
         <input
@@ -268,6 +420,13 @@ export default function ProOnboardingPage({
           placeholder="Via / Indirizzo"
           value={form.indirizzo}
           onChange={(e) => handleChange('indirizzo', e.target.value)}
+        />
+
+        <textarea
+          style={textAreaStyle}
+          placeholder="Bio professionale"
+          value={form.bio}
+          onChange={(e) => handleChange('bio', e.target.value)}
         />
 
         <div style={{ marginTop: 16 }}>
@@ -401,8 +560,8 @@ export default function ProOnboardingPage({
             lineHeight: 1.6,
           }}
         >
-          Dopo il salvataggio vedrai la dashboard professionista. Da lì potrai completare
-          servizi, prezzi, documenti e verifica.
+          Dopo il salvataggio il tuo profilo verrà inviato per approvazione admin.
+          Finché non sarà approvato non potrai lavorare sulla piattaforma.
         </div>
 
         <button
@@ -422,7 +581,7 @@ export default function ProOnboardingPage({
             opacity: isSubmitting ? 0.7 : 1,
           }}
         >
-          {isSubmitting ? 'Salvataggio...' : 'Completa onboarding'}
+          {isSubmitting ? 'Salvataggio...' : 'Invia per approvazione'}
         </button>
       </div>
 
