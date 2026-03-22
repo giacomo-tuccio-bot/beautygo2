@@ -1523,6 +1523,13 @@ export default function App() {
     return (
       <LoginPage
         onBack={() => setScreen('tabs')}
+        onAdminLogin={() => {
+          setSessionUserId(null);
+          setUserRole('admin');
+          setScreen('tabs');
+          setTab('profile');
+          resetProfessionalWorkflowState();
+        }}
         onOtpRequested={(email) => {
           setOtpEmail(email);
           setScreen('verifyOtp');

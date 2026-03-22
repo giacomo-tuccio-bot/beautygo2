@@ -34,7 +34,7 @@ export default function VerifyOtpPage({
     if (isLoading) return;
 
     const cleanCode = code.trim();
-    if (cleanCode.length < 8) {
+    if (cleanCode.length < 6) {
       alert('Inserisci il codice ricevuto via email.');
       return;
     }
@@ -145,9 +145,9 @@ export default function VerifyOtpPage({
         </div>
         <input
           style={inputStyle}
-          placeholder="00000000"
+          placeholder="000000"
           inputMode="numeric"
-          maxLength={8}
+          maxLength={6}
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
           onKeyDown={(e) => {

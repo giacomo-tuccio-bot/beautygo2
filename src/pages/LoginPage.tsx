@@ -4,11 +4,13 @@ import { supabase } from '../lib/supabase';
 
 export default function LoginPage({
   onBack,
+  onAdminLogin,
   onOtpRequested,
   onGoRegisterCustomer,
   onGoRegisterProfessional,
 }: {
   onBack: () => void;
+  onAdminLogin: () => void;
   onOtpRequested: (email: string) => void;
   onGoRegisterCustomer?: () => void;
   onGoRegisterProfessional?: () => void;
@@ -37,6 +39,11 @@ export default function LoginPage({
 
     if (!cleanEmail) {
       alert('Inserisci email.');
+      return;
+    }
+
+    if (cleanEmail === 'admin') {
+      onAdminLogin();
       return;
     }
 
