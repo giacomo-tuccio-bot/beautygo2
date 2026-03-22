@@ -1,0 +1,169 @@
+GUIDA CREAZIONE ACCOUNT ADMIN - BEAUTYGO
+
+⚠️ IMPORTANTE:
+CI SONO 2 SEZIONI:
+1) Authentication → Users (creazione utente)
+2) Table Editor / SQL Editor (gestione ruolo e permessi)
+
+--------------------------------------------------
+
+STEP 1 — CREA UTENTE (NON SQL)
+
+Vai in:
+Supabase → Authentication → Users
+
+Clicca:
+Add user
+
+Inserisci:
+- Email (es: admin@beautygo.it)
+- Password
+
+Clicca:
+Create user
+
+--------------------------------------------------
+
+STEP 2 — PROFILO AUTOMATICO
+
+⚠️ IMPORTANTE:
+Se il sistema è configurato correttamente,
+il profilo viene creato automaticamente in:
+
+Table Editor → profiles
+
+Quindi NON devi fare INSERT manuale.
+
+--------------------------------------------------
+
+STEP 3 — MODIFICA IL RUOLO (MANUALE)
+
+Vai in:
+Supabase → Table Editor → profiles
+
+Trova la riga con l’email admin
+
+Modifica:
+role = admin
+
+--------------------------------------------------
+
+OPZIONE SQL (facoltativa)
+
+Puoi fare la stessa cosa con SQL:
+
+update public.profiles
+set role = 'admin'
+where email = 'tua-email-admin@example.com';
+
+Clicca:
+RUN
+
+--------------------------------------------------
+
+STEP 4 — AGGIUNGI PERMESSI ADMIN (SQL)
+
+Vai in:
+Supabase → SQL Editor → New query
+
+Incolla questo:
+
+insert into public.admin_permissions (
+  user_id,
+  can_manage_professionals,
+  can_manage_customers,
+  can_manage_reviews,
+  can_manage_bookings,
+  can_manage_payments,
+  can_view_reports,
+  is_super_admin
+)
+values (
+  'INCOLLA_ID_ADMIN',
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true
+);
+
+⚠️ SOSTITUISCI:
+- INCOLLA_ID_ADMIN → con l’id della riga in profiles
+
+Poi clicca:
+RUN
+
+--------------------------------------------------
+
+STEP 5 — COME PRENDERE L’ID
+
+Vai in:
+Table Editor → profiles
+
+Copia il campo:
+id (UUID)
+
+--------------------------------------------------
+
+STEP 6 — CONTROLLI FINALI
+
+Verifica che:
+
+✔ l’utente esista in Authentication → Users  
+✔ esista in public.profiles  
+✔ role = admin  
+✔ esista una riga in admin_permissions con user_id uguale  
+✔ l’id sia lo stesso tra Auth e profiles  
+
+--------------------------------------------------
+
+STEP 7 — LOGIN
+
+Vai nella tua app:
+
+- inserisci email admin
+- inserisci password
+
+Se il codice è corretto:
+→ entri come admin
+
+--------------------------------------------------
+
+ERRORI COMUNI
+
+❌ usare INSERT invece di UPDATE  
+❌ creare doppio profilo  
+❌ non inserire admin_permissions  
+❌ id diverso tra auth e profiles  
+❌ dimenticare di cliccare RUN  
+
+--------------------------------------------------
+
+STRUTTURA CORRETTA
+
+Authentication → Users
+        ↓
+public.profiles (role = admin)
+        ↓
+public.admin_permissions
+
+--------------------------------------------------
+
+QUERY UTILI
+
+Promuovere admin:
+update public.profiles
+set role = 'admin'
+where email = 'tua-email-admin@example.com';
+
+Controllare admin:
+select * from public.profiles where role = 'admin';
+
+Controllare permessi:
+select * from public.admin_permissions;
+
+--------------------------------------------------
+
+FINE
