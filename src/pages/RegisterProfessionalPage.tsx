@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { colors } from '../theme';
 import type { ProOnboardingFormData } from './ProOnboardingPage';
 
-export type RegisterProfessionalFormData = ProOnboardingFormData;
+export type RegisterProfessionalFormData = ProOnboardingFormData & { password: string };
 
 export default function RegisterProfessionalPage({
   onBack,
@@ -16,6 +16,7 @@ export default function RegisterProfessionalPage({
     nome: '',
     cognome: '',
     email: '',
+    password: '',
     telefono: '',
     citta: '',
     indirizzo: '',
@@ -73,6 +74,7 @@ export default function RegisterProfessionalPage({
       ['nome', form.nome],
       ['cognome', form.cognome],
       ['email', form.email],
+      ['password', form.password],
       ['telefono', form.telefono],
       ['citta', form.citta],
       ['indirizzo', form.indirizzo],
@@ -92,6 +94,11 @@ export default function RegisterProfessionalPage({
 
     if (!form.email.includes('@')) {
       alert('Inserisci un indirizzo email valido.');
+      return false;
+    }
+
+    if (form.password.trim().length < 6) {
+      alert('La password deve contenere almeno 6 caratteri.');
       return false;
     }
 
@@ -117,6 +124,7 @@ export default function RegisterProfessionalPage({
     setIsSubmitting(true);
 
     const cleanEmail = form.email.trim().toLowerCase();
+    const cleanPassword = form.password.trim();
 
     try {
       const { error: pendingError } = await supabase.from('pending_registrations').insert({
@@ -152,10 +160,10 @@ export default function RegisterProfessionalPage({
         return;
       }
 
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signUp({
         email: cleanEmail,
+        password: cleanPassword,
         options: {
-          shouldCreateUser: true,
           data: {
             role: 'professional',
           },
@@ -168,7 +176,7 @@ export default function RegisterProfessionalPage({
         return;
       }
 
-      alert('Ti abbiamo inviato un codice via email.');
+      alert('Registrazione avviata. Ti abbiamo inviato un codice di verifica via email.');
       onOtpRequested(cleanEmail);
     } catch (error: any) {
       console.error('Errore durante la registrazione professionista:', error);
@@ -211,7 +219,7 @@ export default function RegisterProfessionalPage({
           lineHeight: 1.5,
         }}
       >
-        Registrazione completa con anagrafica, contatti e dati fiscali.
+        Registrazione completa con anagrafica, contatti, dati fiscali e verifica email con codice.
         <br />
         Riceverai un codice di verifica via email.
       </p>
@@ -245,6 +253,14 @@ export default function RegisterProfessionalPage({
           value={form.email}
           onChange={(e) => handleChange('email', e.target.value)}
           autoComplete="email"
+        />
+        <input
+          style={inputStyle}
+          type="password"
+          placeholder="Password *"
+          value={form.password}
+          onChange={(e) => handleChange('password', e.target.value)}
+          autoComplete="new-password"
         />
         <input
           style={inputStyle}

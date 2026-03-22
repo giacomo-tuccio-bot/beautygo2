@@ -53,6 +53,7 @@ export default function VerifyOtpPage({
         return;
       }
 
+      alert('Email verificata correttamente. Da ora puoi accedere con email e password.');
       await onVerified();
     } catch (error) {
       console.error('Errore verifica OTP:', error);
@@ -68,11 +69,9 @@ export default function VerifyOtpPage({
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
         email,
-        options: {
-          shouldCreateUser: false,
-        },
       });
 
       if (error) {
@@ -107,7 +106,7 @@ export default function VerifyOtpPage({
           textAlign: 'center',
         }}
       >
-        Inserisci il codice
+        Verifica la tua email
       </h1>
 
       <p
@@ -141,13 +140,13 @@ export default function VerifyOtpPage({
             marginBottom: 4,
           }}
         >
-          Codice OTP
+          Codice email
         </div>
         <input
           style={inputStyle}
           placeholder="000000"
           inputMode="numeric"
-          maxLength={6}
+          maxLength={8}
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
           onKeyDown={(e) => {
@@ -173,7 +172,7 @@ export default function VerifyOtpPage({
             cursor: 'pointer',
           }}
         >
-          {isLoading ? 'Verifica in corso...' : 'Verifica codice'}
+          {isLoading ? 'Verifica in corso...' : 'Verifica email'}
         </button>
 
         <button
@@ -192,7 +191,7 @@ export default function VerifyOtpPage({
             cursor: 'pointer',
           }}
         >
-          Reinvia codice
+          Invia di nuovo il codice
         </button>
 
         <button
@@ -201,6 +200,8 @@ export default function VerifyOtpPage({
             width: '100%',
             marginTop: 10,
             border: 'none',
+            borderRadius: 16,
+            padding: '14px 16px',
             background: 'transparent',
             color: colors.muted,
             fontWeight: 700,
@@ -208,7 +209,7 @@ export default function VerifyOtpPage({
             cursor: 'pointer',
           }}
         >
-          Torna indietro
+          Torna al login
         </button>
       </div>
     </div>

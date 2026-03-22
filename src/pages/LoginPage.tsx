@@ -4,18 +4,15 @@ import { supabase } from '../lib/supabase';
 
 export default function LoginPage({
   onBack,
-  onAdminLogin,
-  onOtpRequested,
   onGoRegisterCustomer,
   onGoRegisterProfessional,
 }: {
   onBack: () => void;
-  onAdminLogin: () => void;
-  onOtpRequested: (email: string) => void;
   onGoRegisterCustomer?: () => void;
   onGoRegisterProfessional?: () => void;
 }) {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const input: React.CSSProperties = {
@@ -32,41 +29,32 @@ export default function LoginPage({
     color: colors.text,
   };
 
-  const handleSendCode = async () => {
+  const handleLogin = async () => {
     if (isLoading) return;
 
     const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
-    if (!cleanEmail) {
-      alert('Inserisci email.');
-      return;
-    }
-
-    if (cleanEmail === 'admin') {
-      onAdminLogin();
+    if (!cleanEmail || !cleanPassword) {
+      alert('Inserisci email e password.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
-        options: {
-          shouldCreateUser: false,
-        },
+        password: cleanPassword,
       });
 
       if (error) {
         alert(error.message);
         return;
       }
-
-      alert('Ti abbiamo inviato un codice via email.');
-      onOtpRequested(cleanEmail);
     } catch (error) {
-      console.error('Errore invio codice login:', error);
-      alert('Errore durante l’invio del codice.');
+      console.error('Errore login:', error);
+      alert('Errore durante il login.');
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +78,7 @@ export default function LoginPage({
           textAlign: 'center',
         }}
       >
-        Accedi con codice
+        Accedi
       </h1>
 
       <p
@@ -102,7 +90,7 @@ export default function LoginPage({
           lineHeight: 1.5,
         }}
       >
-        Inserisci la tua email e riceverai un codice di accesso.
+        Inserisci email e password per accedere.
       </p>
 
       <div
@@ -130,15 +118,35 @@ export default function LoginPage({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
+        />
+
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: colors.muted,
+            marginTop: 12,
+            marginBottom: 4,
+          }}
+        >
+          Password
+        </div>
+        <input
+          style={input}
+          type="password"
+          placeholder="Inserisci la tua password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              void handleSendCode();
+              void handleLogin();
             }
           }}
         />
 
         <button
-          onClick={() => void handleSendCode()}
+          onClick={() => void handleLogin()}
           disabled={isLoading}
           style={{
             width: '100%',
@@ -153,7 +161,7 @@ export default function LoginPage({
             cursor: 'pointer',
           }}
         >
-          {isLoading ? 'Invio in corso...' : 'Ricevi codice'}
+          {isLoading ? 'Accesso in corso...' : 'Accedi'}
         </button>
 
         <button
@@ -177,6 +185,8 @@ export default function LoginPage({
         <div
           style={{
             marginTop: 18,
+            paddingTop: 16,
+            borderTop: '1px solid #F3E7DC',
             display: 'grid',
             gap: 10,
           }}
@@ -184,12 +194,14 @@ export default function LoginPage({
           <button
             onClick={onGoRegisterCustomer}
             style={{
-              border: 'none',
-              background: '#F7F1EE',
-              borderRadius: 14,
-              padding: '12px 14px',
-              fontWeight: 700,
+              width: '100%',
+              border: '1px solid #E9D7C7',
+              borderRadius: 16,
+              padding: '14px 16px',
+              background: '#fff',
               color: colors.text,
+              fontWeight: 700,
+              fontSize: 14,
               cursor: 'pointer',
             }}
           >
@@ -199,12 +211,14 @@ export default function LoginPage({
           <button
             onClick={onGoRegisterProfessional}
             style={{
+              width: '100%',
               border: 'none',
-              background: '#F7F1EE',
-              borderRadius: 14,
-              padding: '12px 14px',
-              fontWeight: 700,
-              color: colors.text,
+              borderRadius: 16,
+              padding: '14px 16px',
+              background: '#3B2F2F',
+              color: '#fff',
+              fontWeight: 800,
+              fontSize: 14,
               cursor: 'pointer',
             }}
           >

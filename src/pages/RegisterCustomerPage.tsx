@@ -13,6 +13,7 @@ export default function RegisterCustomerPage({
     nome: '',
     cognome: '',
     email: '',
+    password: '',
     telefono: '',
     citta: '',
     indirizzo: '',
@@ -41,8 +42,8 @@ export default function RegisterCustomerPage({
   const handleSubmit = async () => {
     if (isSubmitting) return;
 
-    if (!form.nome.trim() || !form.cognome.trim() || !form.email.trim()) {
-      alert('Compila almeno nome, cognome ed email.');
+    if (!form.nome.trim() || !form.cognome.trim() || !form.email.trim() || !form.password.trim()) {
+      alert('Compila nome, cognome, email e password.');
       return;
     }
 
@@ -51,9 +52,15 @@ export default function RegisterCustomerPage({
       return;
     }
 
+    if (form.password.trim().length < 6) {
+      alert('La password deve contenere almeno 6 caratteri.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const cleanEmail = form.email.trim().toLowerCase();
+    const cleanPassword = form.password.trim();
 
     try {
       const { error: pendingError } = await supabase.from('pending_registrations').insert({
@@ -77,10 +84,10 @@ export default function RegisterCustomerPage({
         return;
       }
 
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signUp({
         email: cleanEmail,
+        password: cleanPassword,
         options: {
-          shouldCreateUser: true,
           data: {
             role: 'customer',
           },
@@ -93,7 +100,7 @@ export default function RegisterCustomerPage({
         return;
       }
 
-      alert('Ti abbiamo inviato un codice via email.');
+      alert('Registrazione avviata. Ti abbiamo inviato un codice di verifica via email.');
       onOtpRequested(cleanEmail);
     } catch (error: any) {
       alert(
@@ -135,7 +142,7 @@ export default function RegisterCustomerPage({
           lineHeight: 1.5,
         }}
       >
-        Inserisci i tuoi dati e riceverai un codice di verifica via email.
+        Inserisci i tuoi dati, verifica l’email con il codice e poi accederai con email e password.
       </p>
 
       <div
@@ -168,6 +175,14 @@ export default function RegisterCustomerPage({
         />
         <input
           style={inputStyle}
+          type="password"
+          placeholder="Password *"
+          value={form.password}
+          onChange={(e) => handleChange('password', e.target.value)}
+          autoComplete="new-password"
+        />
+        <input
+          style={inputStyle}
           placeholder="Telefono"
           value={form.telefono}
           onChange={(e) => handleChange('telefono', e.target.value)}
@@ -186,7 +201,7 @@ export default function RegisterCustomerPage({
         />
 
         <button
-          onClick={() => void handleSubmit()}
+          onClick={handleSubmit}
           disabled={isSubmitting}
           style={{
             width: '100%',
@@ -201,7 +216,7 @@ export default function RegisterCustomerPage({
             cursor: 'pointer',
           }}
         >
-          {isSubmitting ? 'Invio in corso...' : 'Registrati e ricevi il codice'}
+          {isSubmitting ? 'Invio in corso...' : 'Registrati'}
         </button>
 
         <button
