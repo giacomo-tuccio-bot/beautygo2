@@ -7,6 +7,7 @@ import DiscoverPage from './pages/DiscoverPage';
 import BookingsPage from './pages/BookingsPage';
 import ProfilePage from './pages/ProfilePage';
 import LoginPage from './pages/LoginPage';
+import VerifyOtpPage from './pages/VerifyOtpPage';
 import RegisterCustomerPage from './pages/RegisterCustomerPage';
 import RegisterProfessionalPage from './pages/RegisterProfessionalPage';
 import ProOnboardingPage, {
@@ -26,6 +27,7 @@ type Screen =
   | 'login'
   | 'registerCustomer'
   | 'registerProfessional'
+  | 'verifyOtp'
   | 'proOnboarding'
   | 'professionalDetail'
   | 'serviceProfessionals';
@@ -421,6 +423,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [screen, setScreen] = useState<Screen>('tabs');
   const [userRole, setUserRole] = useState<UserRole>('guest');
+  const [otpEmail, setOtpEmail] = useState('');
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -748,6 +751,7 @@ export default function App() {
     setScreen('tabs');
     setTab('profile');
     resetProfessionalWorkflowState();
+    setOtpEmail('');
     setAuthReady(true);
   };
 
@@ -1526,7 +1530,10 @@ export default function App() {
           setTab('profile');
           resetProfessionalWorkflowState();
         }}
-        onLoginSuccess={bootstrapAuth}
+        onOtpRequested={(email) => {
+          setOtpEmail(email);
+          setScreen('verifyOtp');
+        }}
         onGoRegisterCustomer={() => setScreen('registerCustomer')}
         onGoRegisterProfessional={() => setScreen('registerProfessional')}
       />
@@ -1534,15 +1541,36 @@ export default function App() {
   }
 
   if (screen === 'registerCustomer') {
-    return <RegisterCustomerPage onBack={() => setScreen('tabs')} />;
+    return (
+      <RegisterCustomerPage
+        onBack={() => setScreen('tabs')}
+        onOtpRequested={(email) => {
+          setOtpEmail(email);
+          setScreen('verifyOtp');
+        }}
+      />
+    );
   }
 
   if (screen === 'registerProfessional') {
     return (
       <RegisterProfessionalPage
         onBack={() => setScreen('tabs')}
-        onGoLogin={() => setScreen('login')}
-        onRegistrationComplete={handleProfessionalOnboardingComplete}
+        onOtpRequested={(email) => {
+          setOtpEmail(email);
+          setScreen('verifyOtp');
+        }}
+      />
+    );
+  }
+
+
+  if (screen === 'verifyOtp') {
+    return (
+      <VerifyOtpPage
+        email={otpEmail}
+        onBack={() => setScreen('login')}
+        onVerified={bootstrapAuth}
       />
     );
   }

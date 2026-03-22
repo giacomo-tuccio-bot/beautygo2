@@ -2,23 +2,19 @@ import React, { useState } from 'react';
 import { colors } from '../theme';
 import { supabase } from '../lib/supabase';
 
-export default function LoginPage({
+export default function VerifyOtpPage({
+  email,
   onBack,
-  onAdminLogin,
-  onOtpRequested,
-  onGoRegisterCustomer,
-  onGoRegisterProfessional,
+  onVerified,
 }: {
+  email: string;
   onBack: () => void;
-  onAdminLogin: () => void;
-  onOtpRequested: (email: string) => void;
-  onGoRegisterCustomer?: () => void;
-  onGoRegisterProfessional?: () => void;
+  onVerified: () => void | Promise<void>;
 }) {
-  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const input: React.CSSProperties = {
+  const inputStyle: React.CSSProperties = {
     width: '100%',
     height: 54,
     borderRadius: 16,
@@ -30,28 +26,50 @@ export default function LoginPage({
     background: '#fff',
     boxSizing: 'border-box',
     color: colors.text,
+    letterSpacing: '0.2em',
+    textAlign: 'center',
   };
 
-  const handleSendCode = async () => {
+  const verifyCode = async () => {
     if (isLoading) return;
 
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (!cleanEmail) {
-      alert('Inserisci email.');
-      return;
-    }
-
-    if (cleanEmail === 'admin') {
-      onAdminLogin();
+    const cleanCode = code.trim();
+    if (cleanCode.length < 6) {
+      alert('Inserisci il codice ricevuto via email.');
       return;
     }
 
     setIsLoading(true);
 
     try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: cleanCode,
+        type: 'email',
+      });
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      await onVerified();
+    } catch (error) {
+      console.error('Errore verifica OTP:', error);
+      alert('Errore durante la verifica del codice.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+
+    try {
       const { error } = await supabase.auth.signInWithOtp({
-        email: cleanEmail,
+        email,
         options: {
           shouldCreateUser: false,
         },
@@ -62,11 +80,10 @@ export default function LoginPage({
         return;
       }
 
-      alert('Ti abbiamo inviato un codice via email.');
-      onOtpRequested(cleanEmail);
+      alert('Codice inviato di nuovo.');
     } catch (error) {
-      console.error('Errore invio codice login:', error);
-      alert('Errore durante l’invio del codice.');
+      console.error('Errore invio OTP:', error);
+      alert('Errore durante il reinvio del codice.');
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +107,7 @@ export default function LoginPage({
           textAlign: 'center',
         }}
       >
-        Accedi con codice
+        Inserisci il codice
       </h1>
 
       <p
@@ -102,7 +119,9 @@ export default function LoginPage({
           lineHeight: 1.5,
         }}
       >
-        Inserisci la tua email e riceverai un codice di accesso.
+        Abbiamo inviato un codice di verifica a
+        <br />
+        <strong style={{ color: colors.text }}>{email}</strong>
       </p>
 
       <div
@@ -122,23 +141,24 @@ export default function LoginPage({
             marginBottom: 4,
           }}
         >
-          Email
+          Codice OTP
         </div>
         <input
-          style={input}
-          placeholder="Inserisci la tua email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
+          style={inputStyle}
+          placeholder="000000"
+          inputMode="numeric"
+          maxLength={6}
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              void handleSendCode();
+              void verifyCode();
             }
           }}
         />
 
         <button
-          onClick={() => void handleSendCode()}
+          onClick={() => void verifyCode()}
           disabled={isLoading}
           style={{
             width: '100%',
@@ -153,11 +173,12 @@ export default function LoginPage({
             cursor: 'pointer',
           }}
         >
-          {isLoading ? 'Invio in corso...' : 'Ricevi codice'}
+          {isLoading ? 'Verifica in corso...' : 'Verifica codice'}
         </button>
 
         <button
-          onClick={onBack}
+          onClick={() => void resendCode()}
+          disabled={isLoading}
           style={{
             width: '100%',
             marginTop: 10,
@@ -171,46 +192,24 @@ export default function LoginPage({
             cursor: 'pointer',
           }}
         >
-          Torna indietro
+          Reinvia codice
         </button>
 
-        <div
+        <button
+          onClick={onBack}
           style={{
-            marginTop: 18,
-            display: 'grid',
-            gap: 10,
+            width: '100%',
+            marginTop: 10,
+            border: 'none',
+            background: 'transparent',
+            color: colors.muted,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: 'pointer',
           }}
         >
-          <button
-            onClick={onGoRegisterCustomer}
-            style={{
-              border: 'none',
-              background: '#F7F1EE',
-              borderRadius: 14,
-              padding: '12px 14px',
-              fontWeight: 700,
-              color: colors.text,
-              cursor: 'pointer',
-            }}
-          >
-            Registrati come cliente
-          </button>
-
-          <button
-            onClick={onGoRegisterProfessional}
-            style={{
-              border: 'none',
-              background: '#F7F1EE',
-              borderRadius: 14,
-              padding: '12px 14px',
-              fontWeight: 700,
-              color: colors.text,
-              cursor: 'pointer',
-            }}
-          >
-            Registrati come professionista
-          </button>
-        </div>
+          Torna indietro
+        </button>
       </div>
     </div>
   );

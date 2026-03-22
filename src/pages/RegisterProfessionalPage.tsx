@@ -3,24 +3,19 @@ import { supabase } from '../lib/supabase';
 import { colors } from '../theme';
 import type { ProOnboardingFormData } from './ProOnboardingPage';
 
-export type RegisterProfessionalFormData = ProOnboardingFormData & {
-  password: string;
-};
+export type RegisterProfessionalFormData = ProOnboardingFormData;
 
 export default function RegisterProfessionalPage({
   onBack,
-  onRegistrationComplete,
-  onGoLogin,
+  onOtpRequested,
 }: {
   onBack: () => void;
-  onRegistrationComplete?: (data: ProOnboardingFormData) => void | Promise<void>;
-  onGoLogin: () => void;
+  onOtpRequested: (email: string) => void;
 }) {
   const [form, setForm] = useState<RegisterProfessionalFormData>({
     nome: '',
     cognome: '',
     email: '',
-    password: '',
     telefono: '',
     citta: '',
     indirizzo: '',
@@ -78,7 +73,6 @@ export default function RegisterProfessionalPage({
       ['nome', form.nome],
       ['cognome', form.cognome],
       ['email', form.email],
-      ['password', form.password],
       ['telefono', form.telefono],
       ['citta', form.citta],
       ['indirizzo', form.indirizzo],
@@ -98,11 +92,6 @@ export default function RegisterProfessionalPage({
 
     if (!form.email.includes('@')) {
       alert('Inserisci un indirizzo email valido.');
-      return false;
-    }
-
-    if (form.password.trim().length < 6) {
-      alert('La password deve contenere almeno 6 caratteri.');
       return false;
     }
 
@@ -128,10 +117,6 @@ export default function RegisterProfessionalPage({
     setIsSubmitting(true);
 
     const cleanEmail = form.email.trim().toLowerCase();
-    const cleanPassword = form.password.trim();
-    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    console.log('VITE_APP_URL =', import.meta.env.VITE_APP_URL);
-console.log('appUrl usato per signup =', appUrl);
 
     try {
       const { error: pendingError } = await supabase.from('pending_registrations').insert({
@@ -159,7 +144,7 @@ console.log('appUrl usato per signup =', appUrl);
       if (pendingError) {
         if ((pendingError.message || '').toLowerCase().includes('duplicate key')) {
           alert(
-            'Esiste già una registrazione in attesa per questa email. Conferma la mail già ricevuta oppure elimina la riga da pending_registrations e riprova.'
+            'Esiste già una registrazione in attesa per questa email. Inserisci il codice già ricevuto oppure usa un’altra email.'
           );
         } else {
           alert(pendingError.message);
@@ -167,11 +152,10 @@ console.log('appUrl usato per signup =', appUrl);
         return;
       }
 
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
-        password: cleanPassword,
         options: {
-          emailRedirectTo: `${appUrl}/`,
+          shouldCreateUser: true,
           data: {
             role: 'professional',
           },
@@ -184,10 +168,8 @@ console.log('appUrl usato per signup =', appUrl);
         return;
       }
 
-      console.log('Signup professionista riuscito:', data);
-
-      alert('Registrazione completata! Controlla la tua email per confermare l’account.');
-      onGoLogin();
+      alert('Ti abbiamo inviato un codice via email.');
+      onOtpRequested(cleanEmail);
     } catch (error: any) {
       console.error('Errore durante la registrazione professionista:', error);
       alert(
@@ -230,6 +212,8 @@ console.log('appUrl usato per signup =', appUrl);
         }}
       >
         Registrazione completa con anagrafica, contatti e dati fiscali.
+        <br />
+        Riceverai un codice di verifica via email.
       </p>
 
       <div
@@ -264,52 +248,53 @@ console.log('appUrl usato per signup =', appUrl);
         />
         <input
           style={inputStyle}
-          type="password"
-          placeholder="Password *"
-          value={form.password}
-          onChange={(e) => handleChange('password', e.target.value)}
-          autoComplete="new-password"
-        />
-        <input
-          style={inputStyle}
-          placeholder="Numero di cellulare *"
+          placeholder="Telefono *"
           value={form.telefono}
           onChange={(e) => handleChange('telefono', e.target.value)}
         />
         <input
           style={inputStyle}
-          placeholder="Città operativa *"
+          placeholder="Città *"
           value={form.citta}
           onChange={(e) => handleChange('citta', e.target.value)}
         />
         <input
           style={inputStyle}
-          placeholder="Indirizzo professionale *"
+          placeholder="Indirizzo *"
           value={form.indirizzo}
           onChange={(e) => handleChange('indirizzo', e.target.value)}
         />
 
-        <div style={sectionTitle}>Identificazione fiscale</div>
+        <div style={sectionTitle}>Documento fiscale principale</div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 10,
-            marginTop: 8,
-          }}
-        >
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button
-            type="button"
             onClick={() => handleChange('tipoDocumentoFiscale', 'piva')}
-            style={toggleButton(isVat)}
+            style={{
+              flex: 1,
+              height: 46,
+              borderRadius: 14,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              background: isVat ? colors.primary : '#F7F1EE',
+              color: isVat ? '#fff' : colors.text,
+            }}
           >
             Partita IVA
           </button>
           <button
-            type="button"
             onClick={() => handleChange('tipoDocumentoFiscale', 'cf')}
-            style={toggleButton(!isVat)}
+            style={{
+              flex: 1,
+              height: 46,
+              borderRadius: 14,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              background: !isVat ? colors.primary : '#F7F1EE',
+              color: !isVat ? '#fff' : colors.text,
+            }}
           >
             Codice Fiscale
           </button>
@@ -322,15 +307,11 @@ console.log('appUrl usato per signup =', appUrl);
           onChange={(e) => handleChange('valoreDocumentoFiscale', e.target.value)}
         />
 
-        <div style={sectionTitle}>Dati fiscali di fatturazione</div>
+        <div style={sectionTitle}>Dati di fatturazione</div>
 
         <input
           style={inputStyle}
-          placeholder={
-            isVat
-              ? 'Intestatario fatturazione / Legale rappresentante *'
-              : 'Intestatario fatturazione *'
-          }
+          placeholder="Intestatario fatturazione *"
           value={form.intestatarioFatturazione}
           onChange={(e) => handleChange('intestatarioFatturazione', e.target.value)}
         />
@@ -339,7 +320,7 @@ console.log('appUrl usato per signup =', appUrl);
           <>
             <input
               style={inputStyle}
-              placeholder="Ragione sociale *"
+              placeholder="Ragione Sociale *"
               value={form.ragioneSociale}
               onChange={(e) => handleChange('ragioneSociale', e.target.value)}
             />
@@ -349,54 +330,43 @@ console.log('appUrl usato per signup =', appUrl);
               value={form.partitaIvaFatturazione}
               onChange={(e) => handleChange('partitaIvaFatturazione', e.target.value)}
             />
-            <input
-              style={inputStyle}
-              placeholder="Codice fiscale di fatturazione (se disponibile)"
-              value={form.codiceFiscaleFatturazione}
-              onChange={(e) => handleChange('codiceFiscaleFatturazione', e.target.value)}
-            />
           </>
         ) : (
-          <>
-            <input
-              style={inputStyle}
-              placeholder="Codice fiscale di fatturazione *"
-              value={form.codiceFiscaleFatturazione}
-              onChange={(e) => handleChange('codiceFiscaleFatturazione', e.target.value)}
-            />
-            <input
-              style={inputStyle}
-              placeholder="Ragione sociale / nome attività (facoltativo)"
-              value={form.ragioneSociale}
-              onChange={(e) => handleChange('ragioneSociale', e.target.value)}
-            />
-          </>
+          <input
+            style={inputStyle}
+            placeholder="Codice Fiscale di fatturazione *"
+            value={form.codiceFiscaleFatturazione}
+            onChange={(e) => handleChange('codiceFiscaleFatturazione', e.target.value)}
+          />
         )}
 
         <input
           style={inputStyle}
-          placeholder="Indirizzo fiscale *"
+          placeholder="Indirizzo fatturazione *"
           value={form.indirizzoFatturazione}
           onChange={(e) => handleChange('indirizzoFatturazione', e.target.value)}
         />
         <input
           style={inputStyle}
-          placeholder="Città fiscale *"
+          placeholder="Città fatturazione *"
           value={form.cittaFatturazione}
           onChange={(e) => handleChange('cittaFatturazione', e.target.value)}
         />
-        <input
-          style={inputStyle}
-          placeholder="CAP *"
-          value={form.capFatturazione}
-          onChange={(e) => handleChange('capFatturazione', e.target.value)}
-        />
-        <input
-          style={inputStyle}
-          placeholder="Provincia *"
-          value={form.provinciaFatturazione}
-          onChange={(e) => handleChange('provinciaFatturazione', e.target.value)}
-        />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            style={{ ...inputStyle, marginTop: 8, flex: 1 }}
+            placeholder="CAP *"
+            value={form.capFatturazione}
+            onChange={(e) => handleChange('capFatturazione', e.target.value)}
+          />
+          <input
+            style={{ ...inputStyle, marginTop: 8, flex: 1 }}
+            placeholder="Provincia *"
+            value={form.provinciaFatturazione}
+            onChange={(e) => handleChange('provinciaFatturazione', e.target.value)}
+          />
+        </div>
+
         <input
           style={inputStyle}
           placeholder="PEC"
@@ -418,95 +388,35 @@ console.log('appUrl usato per signup =', appUrl);
             marginTop: 18,
             border: 'none',
             borderRadius: 16,
-            padding: '14px 14px',
-            background: 'linear-gradient(135deg, #FF8A1F, #FF5A00)',
+            padding: '14px 16px',
+            background: colors.primary,
             color: '#fff',
-            fontWeight: 800,
-            fontSize: 16,
-            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-            opacity: isSubmitting ? 0.7 : 1,
-          }}
-        >
-          {isSubmitting ? 'Registrazione in corso...' : 'Registrati come professionista'}
-        </button>
-
-        <button
-          type="button"
-          onClick={onGoLogin}
-          style={{
-            width: '100%',
-            marginTop: 12,
-            border: 'none',
-            borderRadius: 16,
-            padding: '14px 14px',
-            background: '#FFF3E8',
-            color: '#FF6A00',
             fontWeight: 800,
             fontSize: 15,
             cursor: 'pointer',
           }}
         >
-          Ho già un account, accedi
+          {isSubmitting ? 'Invio in corso...' : 'Registrati e ricevi il codice'}
+        </button>
+
+        <button
+          onClick={onBack}
+          style={{
+            width: '100%',
+            marginTop: 10,
+            border: '1px solid #E9D7C7',
+            borderRadius: 16,
+            padding: '14px 16px',
+            background: '#fff',
+            color: colors.text,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: 'pointer',
+          }}
+        >
+          Torna indietro
         </button>
       </div>
-
-      <BottomBack onBack={onBack} />
-    </div>
-  );
-}
-
-function toggleButton(active: boolean): React.CSSProperties {
-  return {
-    width: '100%',
-    border: 'none',
-    borderRadius: 16,
-    padding: '14px 12px',
-    background: active ? 'linear-gradient(135deg, #FF8A1F, #FF5A00)' : '#FFF3E8',
-    color: active ? '#fff' : '#FF6A00',
-    fontWeight: 800,
-    fontSize: 14,
-    cursor: 'pointer',
-  };
-}
-
-function BottomBack({ onBack }: { onBack: () => void }) {
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        bottom: 14,
-        width: 360,
-        maxWidth: 'calc(100vw - 28px)',
-        height: 76,
-        borderRadius: 24,
-        background: 'rgba(255,255,255,0.96)',
-        backdropFilter: 'blur(16px)',
-        boxShadow: '0 18px 32px rgba(0,0,0,0.10)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '0 14px',
-        zIndex: 50,
-      }}
-    >
-      <button
-        onClick={onBack}
-        style={{
-          width: '100%',
-          border: 'none',
-          borderRadius: 16,
-          padding: '14px 18px',
-          background: '#FFF3E8',
-          color: '#FF7A00',
-          fontWeight: 800,
-          fontSize: 16,
-          cursor: 'pointer',
-        }}
-      >
-        ← Indietro
-      </button>
     </div>
   );
 }
