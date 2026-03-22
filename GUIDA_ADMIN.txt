@@ -1,0 +1,45 @@
+GUIDA CREAZIONE ACCOUNT ADMIN - BEAUTYGO
+
+1. Vai in Supabase > Authentication > Users
+2. Clicca Add user
+3. Inserisci email e password dell'admin
+4. Dopo la creazione, il profilo utente viene creato automaticamente in public.profiles
+5. Vai in Table Editor > profiles
+6. Trova la riga con l'email admin
+7. Modifica role in: admin
+
+OPZIONE SQL PER PROMUOVERE ADMIN
+update public.profiles
+set role = 'admin'
+where email = 'tua-email-admin@example.com';
+
+8. Vai in SQL Editor e inserisci i permessi admin:
+
+insert into public.admin_permissions (
+  user_id,
+  can_manage_professionals,
+  can_manage_customers,
+  can_manage_reviews,
+  can_manage_bookings,
+  can_manage_payments,
+  can_view_reports,
+  is_super_admin
+)
+values (
+  'ID_ADMIN_DA_PROFILES',
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true
+);
+
+9. Accedi nell'app con la stessa email admin
+10. L'app leggerà public.profiles.role e, se è admin, mostrerà la dashboard admin
+
+NOTE IMPORTANTI
+- Non usare più admin/admin hardcoded nel frontend
+- L'id in admin_permissions.user_id deve essere l'id della riga admin in profiles
+- Se admin_permissions esiste già per quell'utente, usa update invece di insert
