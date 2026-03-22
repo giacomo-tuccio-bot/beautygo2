@@ -129,7 +129,7 @@ export default function RegisterProfessionalPage({
 
     const cleanEmail = form.email.trim().toLowerCase();
     const cleanPassword = form.password.trim();
-    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const appUrl = 'https://beautygo2-2orp--5173--4c73681d.local-corp.webcontainer.io';
     console.log('VITE_APP_URL =', import.meta.env.VITE_APP_URL);
 console.log('appUrl usato per signup =', appUrl);
 
