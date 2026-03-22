@@ -54,7 +54,7 @@ export default function RegisterCustomerPage({
 
     const cleanEmail = form.email.trim().toLowerCase();
     const cleanPassword = form.password.trim();
-    const appUrl = 'https://beautygo2-2orp--5173--4c73681d.local-corp.webcontainer.io';
+    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
 
     try {
       const { error: pendingError } = await supabase.from('pending_registrations').insert({
