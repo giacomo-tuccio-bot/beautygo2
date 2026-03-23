@@ -33,9 +33,14 @@ type ProfessionalDocument = {
 
 type ProfessionalServiceItem = {
   id: string;
-  name: string;
-  status: 'draft' | 'pending' | 'approved' | 'rejected';
+  name: string | null;
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | null;
   rejectionReason?: string;
+  description?: string | null;
+  duration_minutes?: number | null;
+  price?: number | null;
+  category?: string | null;
+  is_active?: boolean | null;
 };
 
 type ProfessionalServicePrice = {
@@ -553,7 +558,7 @@ export default function ProfessionalProfilePage({
 
   if (activeSection === 'pricing') {
     const canEditPrices = hasApprovedServices;
-    const priceServices = approvedServices.map((service) => service.name);
+    const priceServices = approvedServices.map((service) => service.name).filter((service): service is string => Boolean(service));
 
     return (
       <div style={pageStyle}>

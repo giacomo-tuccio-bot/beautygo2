@@ -17,7 +17,9 @@ import AdminPage from './pages/AdminPage';
 import ProfessionalDetailPage from './pages/ProfessionalDetailPage';
 import ServiceProfessionalsPage from './pages/ServiceProfessionalsPage';
 import ProfessionalProfilePage from './pages/ProfessionalProfilePage';
+import ProfessionalOnboardingDashboard from './pages/ProfessionalOnboardingDashboard';
 import { supabase } from './lib/supabase';
+import type { AvailabilityRecord, ServiceRecord } from './lib/onboarding';
 import CustomerProfilePage from './pages/CustomerProfilePage';
 
 type Tab = 'home' | 'discover' | 'bookings' | 'profile';
@@ -64,8 +66,15 @@ export type ProfessionalDocument = {
 
 export type ProfessionalServiceItem = {
   id: string;
-  name: string;
-  status: 'draft' | 'pending' | 'approved' | 'rejected';
+  professional_id?: string;
+  name: string | null;
+  description?: string | null;
+  duration_minutes?: number | null;
+  price?: number | null;
+  category?: string | null;
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | null;
+  is_active?: boolean | null;
+  created_at?: string | null;
   rejectionReason?: string;
 };
 
@@ -148,6 +157,11 @@ export type ProfessionalProfileData = {
   provinciaFatturazione: string;
   pec: string;
   codiceDestinatario: string;
+  bio: string;
+  professional_status?: string;
+  onboarding_completed?: boolean;
+  submitted_at?: string;
+  approved_at?: string;
 };
 
 type PersistedAppState = {
@@ -190,6 +204,13 @@ type ProfileRecord = {
   provinciaFatturazione?: string | null;
   pec?: string | null;
   codiceDestinatario?: string | null;
+  bio?: string | null;
+  professional_status?: string | null;
+  onboarding_completed?: boolean | null;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  has_vat?: boolean | null;
+  vat_rate?: number | null;
 };
 
 const STORAGE_KEY = 'beautygo-professional-workflow-v8';
@@ -266,6 +287,11 @@ const emptyProfessionalProfileData: ProfessionalProfileData = {
   provinciaFatturazione: '',
   pec: '',
   codiceDestinatario: '',
+  bio: '',
+  professional_status: 'draft',
+  onboarding_completed: false,
+  submitted_at: undefined,
+  approved_at: undefined,
 };
 
 const createServiceId = (serviceName: string) =>
@@ -319,6 +345,11 @@ const buildProfessionalProfileData = (
   provinciaFatturazione: source?.provinciaFatturazione ?? '',
   pec: source?.pec ?? '',
   codiceDestinatario: source?.codiceDestinatario ?? '',
+  bio: source?.bio ?? '',
+  professional_status: source?.professional_status ?? 'draft',
+  onboarding_completed: source?.onboarding_completed ?? false,
+  submitted_at: source?.submitted_at ?? undefined,
+  approved_at: source?.approved_at ?? undefined,
 });
 
 
@@ -433,6 +464,7 @@ export default function App() {
     useState<ProfessionalProfileSection>('overview');
   const [professionalProfileData, setProfessionalProfileData] =
     useState<ProfessionalProfileData>(emptyProfessionalProfileData);
+  const [professionalStatus, setProfessionalStatus] = useState<string>('draft');
   const [professionalCreatedAt, setProfessionalCreatedAt] = useState<string>('');
   const [professionalProfileImageUrl, setProfessionalProfileImageUrl] = useState<
     string | undefined
@@ -483,6 +515,7 @@ export default function App() {
   const resetProfessionalWorkflowState = (fallbackEmail = '') => {
     setProfessionalProfileSection('overview');
     setProfessionalProfileData(buildProfessionalProfileData(null, fallbackEmail));
+    setProfessionalStatus('draft');
     setProfessionalCreatedAt('');
     setProfessionalProfileImageUrl(undefined);
     setFiscalEditUnlocked(false);
@@ -514,6 +547,7 @@ export default function App() {
       setProfessionalProfileData(
         buildProfessionalProfileData(persisted.professionalProfileData, user.email ?? '')
       );
+      setProfessionalStatus(profile?.professional_status ?? persisted.professionalProfileData.professional_status ?? 'draft');
       setProfessionalCreatedAt(persisted.professionalCreatedAt);
       setProfessionalProfileImageUrl(persisted.professionalProfileImageUrl);
       setFiscalEditUnlocked(persisted.fiscalEditUnlocked);
@@ -536,6 +570,7 @@ export default function App() {
 
     setProfessionalProfileSection('overview');
     setProfessionalProfileData(initialProfile);
+    setProfessionalStatus(profile?.professional_status ?? 'draft');
     setProfessionalCreatedAt(new Date().toISOString());
     setProfessionalProfileImageUrl(undefined);
     setFiscalEditUnlocked(false);
@@ -602,6 +637,66 @@ export default function App() {
     professionalContract,
     professionalProfileSection,
   ]);
+
+
+  const loadProfessionalServices = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('professional_services')
+      .select('*')
+      .eq('professional_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Errore caricamento servizi professionista:', error);
+      return;
+    }
+
+    setProfessionalServices((data ?? []) as ServiceRecord[]);
+  };
+
+  const loadProfessionalAvailability = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('professional_availability')
+      .select('*')
+      .eq('professional_id', userId)
+      .eq('is_active', true)
+      .order('weekday', { ascending: true });
+
+    if (error) {
+      console.error('Errore caricamento disponibilità professionista:', error);
+      return;
+    }
+
+    const availabilityRows = (data ?? []) as AvailabilityRecord[];
+    const dayMap: Record<AvailabilityDayKey, number> = {
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
+      sunday: 7,
+    };
+
+    setProfessionalAvailability(
+      defaultAvailability.map((day) => {
+        const slots = availabilityRows
+          .filter((row) => row.weekday === dayMap[day.key])
+          .map((row) => createAvailabilitySlot(row.start_time.slice(0, 5), row.end_time.slice(0, 5), row.id));
+
+        return {
+          ...day,
+          enabled: slots.length > 0,
+          slots: slots.length > 0 ? slots : day.slots,
+        };
+      })
+    );
+    setAvailabilitySaved(availabilityRows.length > 0);
+  };
+
+  const refreshProfessionalData = async (userId: string) => {
+    await Promise.all([loadProfessionalServices(userId), loadProfessionalAvailability(userId)]);
+  };
 
   const upsertProfileSafely = async (
     payload: Record<string, unknown>,
@@ -768,6 +863,7 @@ export default function App() {
 
       if (role === 'professional') {
         hydrateProfessionalWorkflowState(user.id, user, profile);
+        await refreshProfessionalData(user.id);
       } else {
         resetProfessionalWorkflowState(user.email ?? '');
       }
@@ -1295,6 +1391,9 @@ export default function App() {
       provinciaFatturazione: data.provinciaFatturazione.trim(),
       pec: data.pec.trim(),
       codiceDestinatario: data.codiceDestinatario.trim(),
+      bio: data.bio.trim(),
+      professional_status: 'draft',
+      onboarding_completed: false,
       updated_at: nowIso,
     };
 
@@ -1309,6 +1408,7 @@ export default function App() {
     setSessionUserId(user.id);
     setUserRole('professional');
     setProfessionalProfileData(buildProfessionalProfileData(data, user.email ?? ''));
+    setProfessionalStatus('draft');
     setProfessionalCreatedAt(nowIso);
     setProfessionalProfileImageUrl(undefined);
     setFiscalEditUnlocked(false);
@@ -1363,7 +1463,7 @@ export default function App() {
       onUploadProfessionalProfileImage={handleUploadProfessionalProfileImage}
       onRemoveProfessionalProfileImage={handleRemoveProfessionalProfileImage}
       onSaveProfileData={(data) => {
-        setProfessionalProfileData(data);
+        setProfessionalProfileData((prev) => buildProfessionalProfileData({ ...prev, ...data }));
 
         if (fiscalEditUnlocked) {
           setFiscalEditUnlocked(false);
@@ -1488,6 +1588,119 @@ export default function App() {
     }
 
     if (userRole === 'professional') {
+      if (professionalStatus !== 'approved') {
+        return (
+          <ProfessionalOnboardingDashboard
+            currentTab={tab}
+            onChangeTab={handleTabChange}
+            profile={professionalProfileData}
+            services={professionalServices}
+            availability={professionalAvailability
+              .filter((day) => day.enabled)
+              .flatMap((day) => {
+                const weekdayMap: Record<AvailabilityDayKey, number> = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };
+                return day.slots.map((slot) => ({
+                  id: slot.id,
+                  professional_id: sessionUserId ?? '',
+                  weekday: weekdayMap[day.key],
+                  start_time: slot.startTime,
+                  end_time: slot.endTime,
+                  is_active: true,
+                  created_at: null,
+                }));
+              })}
+            onSaveBaseProfile={async (payload) => {
+              if (!sessionUserId) return;
+              const { error } = await supabase.from('profiles').update({
+                nome: payload.nome?.trim() ?? '',
+                cognome: payload.cognome?.trim() ?? '',
+                telefono: payload.telefono?.trim() ?? '',
+                citta: payload.citta?.trim() ?? '',
+                indirizzo: payload.indirizzo?.trim() ?? '',
+                bio: payload.bio?.trim() ?? '',
+                updated_at: new Date().toISOString(),
+              }).eq('id', sessionUserId);
+              if (error) throw error;
+              setProfessionalProfileData((prev) => buildProfessionalProfileData({ ...prev, ...payload, professional_status: professionalStatus }));
+              alert('Profilo base salvato.');
+            }}
+            onSaveFiscalData={async (payload) => {
+              if (!sessionUserId) return;
+              const nextType = payload.tipoDocumentoFiscale?.trim() || 'piva';
+              const { error } = await supabase.from('profiles').update({
+                tipoDocumentoFiscale: nextType,
+                valoreDocumentoFiscale: payload.valoreDocumentoFiscale?.trim() ?? '',
+                intestatarioFatturazione: payload.intestatarioFatturazione?.trim() ?? '',
+                partitaIvaFatturazione: payload.partitaIvaFatturazione?.trim() ?? '',
+                pec: payload.pec?.trim() ?? '',
+                codiceDestinatario: payload.codiceDestinatario?.trim() ?? '',
+                has_vat: nextType === 'piva',
+                updated_at: new Date().toISOString(),
+              }).eq('id', sessionUserId);
+              if (error) throw error;
+              setProfessionalProfileData((prev) => buildProfessionalProfileData({ ...prev, ...payload, tipoDocumentoFiscale: nextType }));
+              alert('Dati fiscali salvati.');
+            }}
+            onCreateService={async (payload) => {
+              if (!sessionUserId) return;
+              const { error } = await supabase.from('professional_services').insert({
+                professional_id: sessionUserId,
+                name: payload.name.trim(),
+                description: payload.description.trim() || null,
+                duration_minutes: Number(payload.duration_minutes),
+                price: Number(payload.price),
+                category: payload.category.trim() || null,
+                status: 'draft',
+                is_active: true,
+              });
+              if (error) throw error;
+              await loadProfessionalServices(sessionUserId);
+              alert('Servizio aggiunto.');
+            }}
+            onDeleteService={async (serviceId) => {
+              const { error } = await supabase.from('professional_services').delete().eq('id', serviceId);
+              if (error) throw error;
+              if (sessionUserId) await loadProfessionalServices(sessionUserId);
+              alert('Servizio eliminato.');
+            }}
+            onSubmitServices={async () => {
+              if (!sessionUserId) return;
+              const { error } = await supabase.from('professional_services').update({ status: 'pending' }).eq('professional_id', sessionUserId).eq('is_active', true);
+              if (error) throw error;
+              await loadProfessionalServices(sessionUserId);
+              alert('Servizi inviati in revisione.');
+            }}
+            onSaveAvailability={async (days) => {
+              if (!sessionUserId) return;
+              const rows = days.filter((day) => day.enabled).flatMap((day) => day.slots.map((slot) => ({
+                professional_id: sessionUserId,
+                weekday: day.weekday,
+                start_time: slot.start_time,
+                end_time: slot.end_time,
+                is_active: true,
+              })));
+              const { error: deleteError } = await supabase.from('professional_availability').delete().eq('professional_id', sessionUserId);
+              if (deleteError) throw deleteError;
+              if (rows.length > 0) {
+                const { error: insertError } = await supabase.from('professional_availability').insert(rows);
+                if (insertError) throw insertError;
+              }
+              await loadProfessionalAvailability(sessionUserId);
+              alert('Disponibilità salvata.');
+            }}
+            onSubmitOnboarding={async () => {
+              if (!sessionUserId) return;
+              const nowIso = new Date().toISOString();
+              const { error } = await supabase.from('profiles').update({ professional_status: 'submitted', onboarding_completed: false, submitted_at: nowIso, updated_at: nowIso }).eq('id', sessionUserId);
+              if (error) throw error;
+              setProfessionalStatus('submitted');
+              setProfessionalProfileData((prev) => ({ ...prev, professional_status: 'submitted', submitted_at: nowIso }));
+              alert('Onboarding inviato. Ora è in revisione admin.');
+            }}
+            onLogout={handleLogout}
+          />
+        );
+      }
       return renderProfessionalProfile();
     }
 

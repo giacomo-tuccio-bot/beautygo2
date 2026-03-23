@@ -20,6 +20,7 @@ export default function RegisterProfessionalPage({
     telefono: '',
     citta: '',
     indirizzo: '',
+    bio: '',
     tipoDocumentoFiscale: 'piva',
     valoreDocumentoFiscale: '',
     intestatarioFatturazione: '',
