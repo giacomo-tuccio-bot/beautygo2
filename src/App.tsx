@@ -1591,24 +1591,10 @@ export default function App() {
       if (professionalStatus !== 'approved') {
         return (
           <ProfessionalOnboardingDashboard
+            professionalId={sessionUserId ?? ''}
             currentTab={tab}
             onChangeTab={handleTabChange}
             profile={professionalProfileData}
-            services={professionalServices}
-            availability={professionalAvailability
-              .filter((day) => day.enabled)
-              .flatMap((day) => {
-                const weekdayMap: Record<AvailabilityDayKey, number> = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };
-                return day.slots.map((slot) => ({
-                  id: slot.id,
-                  professional_id: sessionUserId ?? '',
-                  weekday: weekdayMap[day.key],
-                  start_time: slot.startTime,
-                  end_time: slot.endTime,
-                  is_active: true,
-                  created_at: null,
-                }));
-              })}
             onSaveBaseProfile={async (payload) => {
               if (!sessionUserId) return;
               const { error } = await supabase.from('profiles').update({
@@ -1640,53 +1626,6 @@ export default function App() {
               if (error) throw error;
               setProfessionalProfileData((prev) => buildProfessionalProfileData({ ...prev, ...payload, tipoDocumentoFiscale: nextType }));
               alert('Dati fiscali salvati.');
-            }}
-            onCreateService={async (payload) => {
-              if (!sessionUserId) return;
-              const { error } = await supabase.from('professional_services').insert({
-                professional_id: sessionUserId,
-                name: payload.name.trim(),
-                description: payload.description.trim() || null,
-                duration_minutes: Number(payload.duration_minutes),
-                price: Number(payload.price),
-                category: payload.category.trim() || null,
-                status: 'draft',
-                is_active: true,
-              });
-              if (error) throw error;
-              await loadProfessionalServices(sessionUserId);
-              alert('Servizio aggiunto.');
-            }}
-            onDeleteService={async (serviceId) => {
-              const { error } = await supabase.from('professional_services').delete().eq('id', serviceId);
-              if (error) throw error;
-              if (sessionUserId) await loadProfessionalServices(sessionUserId);
-              alert('Servizio eliminato.');
-            }}
-            onSubmitServices={async () => {
-              if (!sessionUserId) return;
-              const { error } = await supabase.from('professional_services').update({ status: 'pending' }).eq('professional_id', sessionUserId).eq('is_active', true);
-              if (error) throw error;
-              await loadProfessionalServices(sessionUserId);
-              alert('Servizi inviati in revisione.');
-            }}
-            onSaveAvailability={async (days) => {
-              if (!sessionUserId) return;
-              const rows = days.filter((day) => day.enabled).flatMap((day) => day.slots.map((slot) => ({
-                professional_id: sessionUserId,
-                weekday: day.weekday,
-                start_time: slot.start_time,
-                end_time: slot.end_time,
-                is_active: true,
-              })));
-              const { error: deleteError } = await supabase.from('professional_availability').delete().eq('professional_id', sessionUserId);
-              if (deleteError) throw deleteError;
-              if (rows.length > 0) {
-                const { error: insertError } = await supabase.from('professional_availability').insert(rows);
-                if (insertError) throw insertError;
-              }
-              await loadProfessionalAvailability(sessionUserId);
-              alert('Disponibilità salvata.');
             }}
             onSubmitOnboarding={async () => {
               if (!sessionUserId) return;
