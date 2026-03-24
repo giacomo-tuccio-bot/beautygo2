@@ -183,6 +183,14 @@ type PersistedAppState = {
   professionalProfileSection: ProfessionalProfileSection;
 };
 
+
+type ServiceCatalogRecord = {
+  id: string;
+  name: string;
+  category: string | null;
+  default_duration: number | null;
+};
+
 type ProfileRecord = {
   id?: string;
   email?: string | null;
@@ -479,6 +487,7 @@ export default function App() {
   );
   const [adminRequests, setAdminRequests] = useState<ProfessionalAdminRequest[]>([]);
   const [professionalServices, setProfessionalServices] = useState<ProfessionalServiceItem[]>([]);
+  const [serviceCatalog, setServiceCatalog] = useState<ServiceCatalogRecord[]>([]);
   const [professionalDocuments, setProfessionalDocuments] = useState<ProfessionalDocument[]>([]);
   const [professionalServicePrices, setProfessionalServicePrices] = useState<
     ProfessionalServicePrice[]
@@ -639,11 +648,28 @@ export default function App() {
   ]);
 
 
+  const loadServiceCatalog = async () => {
+    const { data, error } = await supabase
+      .from('service_catalog')
+      .select('*')
+      .order('category', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Errore caricamento catalogo servizi:', error);
+      return;
+    }
+
+    setServiceCatalog((data ?? []) as ServiceCatalogRecord[]);
+  };
+
+
   const loadProfessionalServices = async (userId: string) => {
     const { data, error } = await supabase
       .from('professional_services')
       .select('*')
       .eq('professional_id', userId)
+      .eq('is_active', true)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -697,6 +723,10 @@ export default function App() {
   const refreshProfessionalData = async (userId: string) => {
     await Promise.all([loadProfessionalServices(userId), loadProfessionalAvailability(userId)]);
   };
+
+  useEffect(() => {
+    void loadServiceCatalog();
+  }, []);
 
   const upsertProfileSafely = async (
     payload: Record<string, unknown>,
@@ -1591,10 +1621,25 @@ export default function App() {
       if (professionalStatus !== 'approved') {
         return (
           <ProfessionalOnboardingDashboard
-            professionalId={sessionUserId ?? ''}
             currentTab={tab}
             onChangeTab={handleTabChange}
             profile={professionalProfileData}
+            services={professionalServices}
+            serviceCatalog={serviceCatalog}
+            availability={professionalAvailability
+              .filter((day) => day.enabled)
+              .flatMap((day) => {
+                const weekdayMap: Record<AvailabilityDayKey, number> = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };
+                return day.slots.map((slot) => ({
+                  id: slot.id,
+                  professional_id: sessionUserId ?? '',
+                  weekday: weekdayMap[day.key],
+                  start_time: slot.startTime,
+                  end_time: slot.endTime,
+                  is_active: true,
+                  created_at: null,
+                }));
+              })}
             onSaveBaseProfile={async (payload) => {
               if (!sessionUserId) return;
               const { error } = await supabase.from('profiles').update({
@@ -1626,6 +1671,59 @@ export default function App() {
               if (error) throw error;
               setProfessionalProfileData((prev) => buildProfessionalProfileData({ ...prev, ...payload, tipoDocumentoFiscale: nextType }));
               alert('Dati fiscali salvati.');
+            }}
+            onCreateService={async (payload) => {
+              if (!sessionUserId) return;
+              const selected = serviceCatalog.find((item) => item.id === payload.catalog_id);
+              if (!selected) {
+                alert('Seleziona un servizio dal catalogo.');
+                return;
+              }
+              const { error } = await supabase.from('professional_services').insert({
+                professional_id: sessionUserId,
+                catalog_id: selected.id,
+                name: selected.name,
+                description: payload.description.trim() || null,
+                duration_minutes: Number(payload.duration_minutes),
+                price: Number(payload.price),
+                category: selected.category ?? null,
+                status: 'draft',
+                is_active: true,
+              });
+              if (error) throw error;
+              await loadProfessionalServices(sessionUserId);
+              alert('Servizio aggiunto.');
+            }}
+            onDeleteService={async (serviceId) => {
+              const { error } = await supabase.from('professional_services').update({ is_active: false }).eq('id', serviceId);
+              if (error) throw error;
+              if (sessionUserId) await loadProfessionalServices(sessionUserId);
+              alert('Servizio eliminato.');
+            }}
+            onSubmitServices={async () => {
+              if (!sessionUserId) return;
+              const { error } = await supabase.from('professional_services').update({ status: 'pending' }).eq('professional_id', sessionUserId).eq('is_active', true);
+              if (error) throw error;
+              await loadProfessionalServices(sessionUserId);
+              alert('Servizi inviati in revisione.');
+            }}
+            onSaveAvailability={async (days) => {
+              if (!sessionUserId) return;
+              const rows = days.filter((day) => day.enabled).flatMap((day) => day.slots.map((slot) => ({
+                professional_id: sessionUserId,
+                weekday: day.weekday,
+                start_time: slot.start_time,
+                end_time: slot.end_time,
+                is_active: true,
+              })));
+              const { error: deleteError } = await supabase.from('professional_availability').delete().eq('professional_id', sessionUserId);
+              if (deleteError) throw deleteError;
+              if (rows.length > 0) {
+                const { error: insertError } = await supabase.from('professional_availability').insert(rows);
+                if (insertError) throw insertError;
+              }
+              await loadProfessionalAvailability(sessionUserId);
+              alert('Disponibilità salvata.');
             }}
             onSubmitOnboarding={async () => {
               if (!sessionUserId) return;

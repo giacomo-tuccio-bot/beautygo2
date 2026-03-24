@@ -1,13 +1,7 @@
 export type OnboardingStepStatus = 'todo' | 'completed' | 'in_review' | 'approved' | 'rejected';
 
 export type OnboardingStep = {
-  key:
-    | 'base_profile'
-    | 'fiscal_data'
-    | 'services'
-    | 'availability'
-    | 'documents'
-    | 'final_submission';
+  key: 'base_profile' | 'fiscal_data' | 'services' | 'availability' | 'final_submission';
   order: number;
   title: string;
   description: string;
@@ -17,7 +11,6 @@ export type OnboardingStep = {
 export type ServiceRecord = {
   id: string;
   professional_id?: string;
-  catalog_id?: string | null;
   name: string | null;
   description?: string | null;
   duration_minutes?: number | null;
@@ -36,15 +29,6 @@ export type AvailabilityRecord = {
   end_time: string;
   is_active: boolean;
   created_at: string | null;
-};
-
-export type DocumentRecord = {
-  id: string;
-  professional_id?: string;
-  document_type: string;
-  status?: 'pending' | 'approved' | 'rejected' | null;
-  file_name?: string | null;
-  file_path?: string | null;
 };
 
 export type ProfileForOnboarding = {
@@ -107,30 +91,13 @@ export const getServicesStepStatus = (services: ServiceRecord[]): OnboardingStep
 export const isAvailabilityCompleted = (availability: AvailabilityRecord[]) =>
   availability.some((slot) => slot.is_active && slot.start_time < slot.end_time);
 
-export const getAvailabilityStepStatus = (
-  availability: AvailabilityRecord[]
-): OnboardingStepStatus => (isAvailabilityCompleted(availability) ? 'completed' : 'todo');
-
-export const getDocumentsStepStatus = (documents: DocumentRecord[]): OnboardingStepStatus => {
-  const required = ['identity_front', 'identity_back', 'tax_verification', 'cv'];
-  const requiredDocs = required
-    .map((type) => documents.find((document) => document.document_type === type))
-    .filter(Boolean) as DocumentRecord[];
-
-  if (requiredDocs.length < required.length) return 'todo';
-  if (requiredDocs.every((document) => document.status === 'approved')) return 'approved';
-  if (requiredDocs.some((document) => document.status === 'rejected')) return 'rejected';
-  if (requiredDocs.some((document) => !document.status || document.status === 'pending')) {
-    return 'in_review';
-  }
-  return 'completed';
-};
+export const getAvailabilityStepStatus = (availability: AvailabilityRecord[]): OnboardingStepStatus =>
+  isAvailabilityCompleted(availability) ? 'completed' : 'todo';
 
 export const buildOnboardingSteps = (
   profile: ProfileForOnboarding,
   services: ServiceRecord[],
-  availability: AvailabilityRecord[],
-  documents: DocumentRecord[] = []
+  availability: AvailabilityRecord[]
 ): OnboardingStep[] => {
   const baseProfileStatus: OnboardingStepStatus = isBaseProfileCompleted(profile)
     ? 'completed'
@@ -140,22 +107,14 @@ export const buildOnboardingSteps = (
     : 'todo';
   const servicesStatus = getServicesStepStatus(services);
   const availabilityStatus = getAvailabilityStepStatus(availability);
-  const documentsStatus = getDocumentsStepStatus(documents);
-
-  const allCoreStepsReady = [
-    baseProfileStatus,
-    fiscalStatus,
-    servicesStatus,
-    availabilityStatus,
-    documentsStatus,
-  ].every((status) => ['completed', 'approved', 'in_review'].includes(status));
-
   const finalSubmissionStatus: OnboardingStepStatus =
     profile.professional_status === 'approved'
       ? 'approved'
       : profile.professional_status === 'submitted'
       ? 'in_review'
-      : allCoreStepsReady
+      : [baseProfileStatus, fiscalStatus, servicesStatus, availabilityStatus].every((status) =>
+          ['completed', 'approved'].includes(status)
+        )
       ? 'completed'
       : 'todo';
 
@@ -178,28 +137,21 @@ export const buildOnboardingSteps = (
       key: 'services',
       order: 3,
       title: 'Servizi',
-      description: 'Servizi da catalogo con prezzo e durata a step di 10 minuti.',
+      description: 'Almeno un servizio con nome, prezzo e durata.',
       status: servicesStatus,
     },
     {
       key: 'availability',
       order: 4,
       title: 'Disponibilità',
-      description: 'Più fasce orarie per giorno, a step di 15 minuti.',
+      description: 'Giorni e fasce orarie settimanali.',
       status: availabilityStatus,
     },
     {
-      key: 'documents',
-      order: 5,
-      title: 'Documenti',
-      description: 'Documento identità, verifica fiscale, CV e portfolio lavori.',
-      status: documentsStatus,
-    },
-    {
       key: 'final_submission',
-      order: 6,
+      order: 5,
       title: 'Invio finale',
-      description: "Invia l'onboarding per la revisione admin.",
+      description: 'Invia l\'onboarding per la revisione admin.',
       status: finalSubmissionStatus,
     },
   ];
