@@ -23,7 +23,48 @@ import type { AvailabilityRecord, ServiceRecord } from './lib/onboarding';
 import CustomerProfilePage from './pages/CustomerProfilePage';
 
 type Tab = 'home' | 'discover' | 'bookings' | 'profile';
+// ===== DOCUMENTS HELPERS =====
 
+type ProfessionalDocumentUi = {
+  id: string;
+  name: string;
+  fileName?: string | null;
+  uploadedAt?: string | null;
+  status?: string | null;
+  rejectionReason?: string | null;
+  downloadUrl?: string;
+  filePath?: string | null;
+};
+
+const getDocumentBucket = (documentType: string): 'documents' | 'portfolio' =>
+  documentType.startsWith('portfolio_') ? 'portfolio' : 'documents';
+
+const getDocumentLabel = (documentType: string) => {
+  switch (documentType) {
+    case 'identity_front': return 'Documento identità fronte';
+    case 'identity_back': return 'Documento identità retro';
+    case 'tax_verification': return 'Verifica fiscale / P.IVA';
+    case 'cv': return 'Curriculum Vitae';
+    case 'portfolio_1': return 'Foto lavoro 1';
+    case 'portfolio_2': return 'Foto lavoro 2';
+    case 'portfolio_3': return 'Foto lavoro 3';
+    case 'portfolio_4': return 'Foto lavoro 4';
+    case 'portfolio_5': return 'Foto lavoro 5';
+    default: return documentType;
+  }
+};
+
+const buildEmptyDocumentSlots = (): ProfessionalDocumentUi[] => [
+  { id: 'identity_front', name: 'Documento identità fronte', status: 'missing' },
+  { id: 'identity_back', name: 'Documento identità retro', status: 'missing' },
+  { id: 'tax_verification', name: 'Verifica fiscale / P.IVA', status: 'missing' },
+  { id: 'cv', name: 'Curriculum Vitae', status: 'missing' },
+  { id: 'portfolio_1', name: 'Foto lavoro 1', status: 'missing' },
+  { id: 'portfolio_2', name: 'Foto lavoro 2', status: 'missing' },
+  { id: 'portfolio_3', name: 'Foto lavoro 3', status: 'missing' },
+  { id: 'portfolio_4', name: 'Foto lavoro 4', status: 'missing' },
+  { id: 'portfolio_5', name: 'Foto lavoro 5', status: 'missing' },
+];
 type Screen =
   | 'tabs'
   | 'login'
