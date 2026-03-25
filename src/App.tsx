@@ -183,7 +183,6 @@ type PersistedAppState = {
   professionalProfileSection: ProfessionalProfileSection;
 };
 
-
 type ServiceCatalogRecord = {
   id: string;
   name: string;
@@ -657,19 +656,18 @@ export default function App() {
 
     if (error) {
       console.error('Errore caricamento catalogo servizi:', error);
+      setServiceCatalog([]);
       return;
     }
 
     setServiceCatalog((data ?? []) as ServiceCatalogRecord[]);
   };
 
-
   const loadProfessionalServices = async (userId: string) => {
     const { data, error } = await supabase
       .from('professional_services')
       .select('*')
       .eq('professional_id', userId)
-      .eq('is_active', true)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -1679,6 +1677,7 @@ export default function App() {
                 alert('Seleziona un servizio dal catalogo.');
                 return;
               }
+
               const { error } = await supabase.from('professional_services').insert({
                 professional_id: sessionUserId,
                 catalog_id: selected.id,
@@ -1695,7 +1694,7 @@ export default function App() {
               alert('Servizio aggiunto.');
             }}
             onDeleteService={async (serviceId) => {
-              const { error } = await supabase.from('professional_services').update({ is_active: false }).eq('id', serviceId);
+              const { error } = await supabase.from('professional_services').delete().eq('id', serviceId);
               if (error) throw error;
               if (sessionUserId) await loadProfessionalServices(sessionUserId);
               alert('Servizio eliminato.');

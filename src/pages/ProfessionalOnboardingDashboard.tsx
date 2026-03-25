@@ -64,16 +64,6 @@ const emptyServiceDraft: ServiceDraft = {
   price: '',
 };
 
-
-const timeOptions = Array.from({ length: 96 }, (_, index) => {
-  const minutes = index * 15;
-  const hours = String(Math.floor(minutes / 60)).padStart(2, '0');
-  const mins = String(minutes % 60).padStart(2, '0');
-  return `${hours}:${mins}`;
-});
-
-const durationOptions = Array.from({ length: 24 }, (_, index) => String((index + 1) * 10));
-
 const statusLabel: Record<OnboardingStep['status'], string> = {
   todo: 'Da fare',
   completed: 'Completato',
@@ -299,7 +289,7 @@ export default function ProfessionalOnboardingDashboard({
                   }));
                 }}
                 options={[
-                  { value: '', label: 'Seleziona servizio' },
+                  { value: '', label: serviceCatalog.length > 0 ? 'Seleziona servizio' : 'Catalogo vuoto' },
                   ...serviceCatalog.map((item) => ({
                     value: item.id,
                     label: item.category ? `${item.category} · ${item.name}` : item.name,
@@ -310,7 +300,10 @@ export default function ProfessionalOnboardingDashboard({
                 label="Durata (min)"
                 value={serviceDraft.duration_minutes}
                 onChange={(value) => setServiceDraft((prev) => ({ ...prev, duration_minutes: value }))}
-                options={durationOptions.map((minutes) => ({ value: minutes, label: `${minutes} min` }))}
+                options={Array.from({ length: 24 }, (_, index) => {
+                  const minutes = (index + 1) * 10;
+                  return { value: String(minutes), label: `${minutes} min` };
+                })}
               />
               <Input label="Prezzo (€)" type="number" value={serviceDraft.price} onChange={(value) => setServiceDraft((prev) => ({ ...prev, price: value }))} />
             </div>
@@ -380,17 +373,29 @@ export default function ProfessionalOnboardingDashboard({
                     <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                       {day.slots.map((slot, slotIndex) => (
                         <div key={`${day.weekday}-${slotIndex}`} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <select value={slot.start_time} onChange={(event) => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.map((currentSlot, currentIndex) => currentIndex === slotIndex ? { ...currentSlot, start_time: event.target.value } : currentSlot) } : item))} style={timeInput}>
-                            {timeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                          </select>
+                          <input type="time" step={900} value={slot.start_time} onChange={(event) => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.map((currentSlot, currentIndex) => currentIndex === slotIndex ? { ...currentSlot, start_time: event.target.value } : currentSlot) } : item))} style={timeInput} />
                           <span style={{ color: '#6B7280' }}>→</span>
-                          <select value={slot.end_time} onChange={(event) => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.map((currentSlot, currentIndex) => currentIndex === slotIndex ? { ...currentSlot, end_time: event.target.value } : currentSlot) } : item))} style={timeInput}>
-                            {timeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                          </select>
-                          <button type="button" style={dangerButton} onClick={() => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.length > 1 ? item.slots.filter((_, currentIndex) => currentIndex !== slotIndex) : item.slots } : item))}>Rimuovi fascia</button>
+                          <input type="time" step={900} value={slot.end_time} onChange={(event) => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.map((currentSlot, currentIndex) => currentIndex === slotIndex ? { ...currentSlot, end_time: event.target.value } : currentSlot) } : item))} style={timeInput} />
+                          {day.slots.length > 1 && (
+                            <button
+                              type="button"
+                              style={smallGhostButton}
+                              onClick={() => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.filter((_, currentIndex) => currentIndex !== slotIndex) } : item))}
+                            >
+                              Rimuovi fascia
+                            </button>
+                          )}
                         </div>
                       ))}
-                      <button type="button" style={secondaryButton} onClick={() => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: [...item.slots, { start_time: '09:00', end_time: '13:00' }] } : item))}>Aggiungi fascia oraria</button>
+                      <div>
+                        <button
+                          type="button"
+                          style={smallGhostButton}
+                          onClick={() => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: [...item.slots, { start_time: '09:00', end_time: '13:00' }] } : item))}
+                        >
+                          + Aggiungi fascia oraria
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -445,6 +450,16 @@ function SelectField({ label, value, onChange, options }: { label: string; value
     </label>
   );
 }
+
+const smallGhostButton: CSSProperties = {
+  border: '1px solid #F3D6C3',
+  background: '#FFF8F3',
+  color: '#B45309',
+  borderRadius: 12,
+  padding: '8px 12px',
+  fontWeight: 700,
+  cursor: 'pointer',
+};
 
 const pageStyle: CSSProperties = {
   maxWidth: 920,
