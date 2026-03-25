@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import BottomNav from './components/BottomNav';
@@ -23,48 +22,7 @@ import type { AvailabilityRecord, ServiceRecord } from './lib/onboarding';
 import CustomerProfilePage from './pages/CustomerProfilePage';
 
 type Tab = 'home' | 'discover' | 'bookings' | 'profile';
-// ===== DOCUMENTS HELPERS =====
 
-type ProfessionalDocumentUi = {
-  id: string;
-  name: string;
-  fileName?: string | null;
-  uploadedAt?: string | null;
-  status?: string | null;
-  rejectionReason?: string | null;
-  downloadUrl?: string;
-  filePath?: string | null;
-};
-
-const getDocumentBucket = (documentType: string): 'documents' | 'portfolio' =>
-  documentType.startsWith('portfolio_') ? 'portfolio' : 'documents';
-
-const getDocumentLabel = (documentType: string) => {
-  switch (documentType) {
-    case 'identity_front': return 'Documento identità fronte';
-    case 'identity_back': return 'Documento identità retro';
-    case 'tax_verification': return 'Verifica fiscale / P.IVA';
-    case 'cv': return 'Curriculum Vitae';
-    case 'portfolio_1': return 'Foto lavoro 1';
-    case 'portfolio_2': return 'Foto lavoro 2';
-    case 'portfolio_3': return 'Foto lavoro 3';
-    case 'portfolio_4': return 'Foto lavoro 4';
-    case 'portfolio_5': return 'Foto lavoro 5';
-    default: return documentType;
-  }
-};
-
-const buildEmptyDocumentSlots = (): ProfessionalDocumentUi[] => [
-  { id: 'identity_front', name: 'Documento identità fronte', status: 'missing' },
-  { id: 'identity_back', name: 'Documento identità retro', status: 'missing' },
-  { id: 'tax_verification', name: 'Verifica fiscale / P.IVA', status: 'missing' },
-  { id: 'cv', name: 'Curriculum Vitae', status: 'missing' },
-  { id: 'portfolio_1', name: 'Foto lavoro 1', status: 'missing' },
-  { id: 'portfolio_2', name: 'Foto lavoro 2', status: 'missing' },
-  { id: 'portfolio_3', name: 'Foto lavoro 3', status: 'missing' },
-  { id: 'portfolio_4', name: 'Foto lavoro 4', status: 'missing' },
-  { id: 'portfolio_5', name: 'Foto lavoro 5', status: 'missing' },
-];
 type Screen =
   | 'tabs'
   | 'login'
@@ -98,11 +56,15 @@ export type DocumentStatus =
 export type ProfessionalDocument = {
   id: string;
   name: string;
-  fileName?: string;
-  uploadedAt?: string;
+  fileName?: string | null;
+  uploadedAt?: string | null;
   status: DocumentStatus;
-  rejectionReason?: string;
+  rejectionReason?: string | null;
   downloadUrl?: string;
+};
+
+type ProfessionalDocumentUi = ProfessionalDocument & {
+  filePath?: string | null;
 };
 
 export type ProfessionalServiceItem = {
@@ -215,7 +177,7 @@ type PersistedAppState = {
   fiscalChangeRequestNote?: string;
   adminRequests: ProfessionalAdminRequest[];
   professionalServices: ProfessionalServiceItem[];
-  professionalDocuments: Omit<ProfessionalDocument, 'downloadUrl'>[];
+  professionalDocuments: Omit<ProfessionalDocumentUi, 'downloadUrl' | 'filePath'>[];
   professionalServicePrices: ProfessionalServicePrice[];
   professionalAvailability: AvailabilityDay[];
   availabilitySaved: boolean;
@@ -262,6 +224,46 @@ type ProfileRecord = {
 };
 
 const STORAGE_KEY = 'beautygo-professional-workflow-v8';
+
+const getDocumentBucket = (documentType: string): 'documents' | 'portfolio' =>
+  documentType.startsWith('portfolio_') ? 'portfolio' : 'documents';
+
+const getDocumentLabel = (documentType: string) => {
+  switch (documentType) {
+    case 'identity_front':
+      return 'Documento identità fronte';
+    case 'identity_back':
+      return 'Documento identità retro';
+    case 'tax_verification':
+      return 'Verifica fiscale / P.IVA';
+    case 'cv':
+      return 'Curriculum Vitae';
+    case 'portfolio_1':
+      return 'Foto lavoro 1';
+    case 'portfolio_2':
+      return 'Foto lavoro 2';
+    case 'portfolio_3':
+      return 'Foto lavoro 3';
+    case 'portfolio_4':
+      return 'Foto lavoro 4';
+    case 'portfolio_5':
+      return 'Foto lavoro 5';
+    default:
+      return documentType;
+  }
+};
+
+const buildEmptyDocumentSlots = (): ProfessionalDocumentUi[] => [
+  { id: 'identity_front', name: 'Documento identità fronte', status: 'missing' },
+  { id: 'identity_back', name: 'Documento identità retro', status: 'missing' },
+  { id: 'tax_verification', name: 'Verifica fiscale / P.IVA', status: 'missing' },
+  { id: 'cv', name: 'Curriculum Vitae', status: 'missing' },
+  { id: 'portfolio_1', name: 'Foto lavoro 1', status: 'missing' },
+  { id: 'portfolio_2', name: 'Foto lavoro 2', status: 'missing' },
+  { id: 'portfolio_3', name: 'Foto lavoro 3', status: 'missing' },
+  { id: 'portfolio_4', name: 'Foto lavoro 4', status: 'missing' },
+  { id: 'portfolio_5', name: 'Foto lavoro 5', status: 'missing' },
+];
 
 const createAvailabilitySlot = (
   startTime = '09:00',
@@ -389,7 +391,6 @@ const buildProfessionalProfileData = (
   approved_at: source?.approved_at ?? undefined,
 });
 
-
 const normalizeAvailability = (availability?: unknown): AvailabilityDay[] => {
   if (!Array.isArray(availability) || availability.length === 0) {
     return defaultAvailability;
@@ -464,8 +465,12 @@ const getInitialPersistedState = (userId: string): PersistedAppState | null => {
         ? parsed.professionalServices
         : [],
       professionalDocuments: Array.isArray(parsed.professionalDocuments)
-        ? parsed.professionalDocuments.map((doc) => ({ ...doc, downloadUrl: undefined }))
-        : [],
+        ? parsed.professionalDocuments.map((doc) => ({
+            ...doc,
+            downloadUrl: undefined,
+            filePath: undefined,
+          }))
+        : buildEmptyDocumentSlots(),
       professionalServicePrices: Array.isArray(parsed.professionalServicePrices)
         ? parsed.professionalServicePrices
         : [],
@@ -496,7 +501,6 @@ export default function App() {
   const [selectedProfessionalId, setSelectedProfessionalId] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [bookingsInitialMacro, setBookingsInitialMacro] = useState('Tutte');
-  
 
   const [professionalProfileSection, setProfessionalProfileSection] =
     useState<ProfessionalProfileSection>('overview');
@@ -518,7 +522,6 @@ export default function App() {
   const [adminRequests, setAdminRequests] = useState<ProfessionalAdminRequest[]>([]);
   const [professionalServices, setProfessionalServices] = useState<ProfessionalServiceItem[]>([]);
   const [serviceCatalog, setServiceCatalog] = useState<ServiceCatalogRecord[]>([]);
-  
   const [professionalServicePrices, setProfessionalServicePrices] = useState<
     ProfessionalServicePrice[]
   >([]);
@@ -530,13 +533,12 @@ export default function App() {
     defaultRequests
   );
   const [professionalDocuments, setProfessionalDocuments] = useState<ProfessionalDocumentUi[]>(
-  buildEmptyDocumentSlots()
-);
+    buildEmptyDocumentSlots()
+  );
   const [professionalContract, setProfessionalContract] = useState<ProfessionalContract>({
     contractType: 'vat',
     status: 'locked',
   });
-  
 
   const documentsRef = useRef<ProfessionalDocumentUi[]>(professionalDocuments);
   const lastAuthSyncIdRef = useRef(0);
@@ -548,7 +550,7 @@ export default function App() {
   useEffect(() => {
     return () => {
       documentsRef.current.forEach((doc) => {
-        if (doc.downloadUrl) {
+        if (doc.downloadUrl?.startsWith('blob:')) {
           URL.revokeObjectURL(doc.downloadUrl);
         }
       });
@@ -590,7 +592,11 @@ export default function App() {
       setProfessionalProfileData(
         buildProfessionalProfileData(persisted.professionalProfileData, user.email ?? '')
       );
-      setProfessionalStatus(profile?.professional_status ?? persisted.professionalProfileData.professional_status ?? 'draft');
+      setProfessionalStatus(
+        profile?.professional_status ??
+          persisted.professionalProfileData.professional_status ??
+          'draft'
+      );
       setProfessionalCreatedAt(persisted.professionalCreatedAt);
       setProfessionalProfileImageUrl(persisted.professionalProfileImageUrl);
       setFiscalEditUnlocked(persisted.fiscalEditUnlocked);
@@ -647,7 +653,7 @@ export default function App() {
       fiscalChangeRequestNote,
       adminRequests,
       professionalServices,
-      professionalDocuments: professionalDocuments.map(({ downloadUrl, ...doc }) => doc),
+      professionalDocuments: professionalDocuments.map(({ downloadUrl, filePath, ...doc }) => doc),
       professionalServicePrices,
       professionalAvailability,
       availabilitySaved,
@@ -681,7 +687,6 @@ export default function App() {
     professionalProfileSection,
   ]);
 
-
   const loadServiceCatalog = async () => {
     const { data, error } = await supabase
       .from('service_catalog')
@@ -713,39 +718,40 @@ export default function App() {
     setProfessionalServices((data ?? []) as ServiceRecord[]);
   };
 
+  const loadProfessionalDocuments = async (professionalId: string) => {
+    const baseSlots = buildEmptyDocumentSlots();
+
+    const { data, error } = await supabase
+      .from('professional_documents')
+      .select('*')
+      .eq('professional_id', professionalId);
+
+    if (error) {
+      console.error('Errore caricamento documenti professionista:', error);
+      setProfessionalDocuments(baseSlots);
+      return;
+    }
+
+    const mapped: ProfessionalDocumentUi[] = (data ?? []).map((row: any) => ({
+      id: row.document_type,
+      name: getDocumentLabel(row.document_type),
+      fileName: row.file_name ?? null,
+      uploadedAt: row.created_at ?? null,
+      status: (row.status ?? 'draft') as DocumentStatus,
+      rejectionReason: row.rejection_reason ?? null,
+      filePath: row.file_path ?? null,
+      downloadUrl: undefined,
+    }));
+
+    const merged = baseSlots.map((slot) => {
+      const found = mapped.find((doc) => doc.id === slot.id);
+      return found ?? slot;
+    });
+
+    setProfessionalDocuments(merged);
+  };
+
   const loadProfessionalAvailability = async (userId: string) => {
-    const loadProfessionalDocuments = async (professionalId: string) => {
-  const baseSlots = buildEmptyDocumentSlots();
-
-  const { data, error } = await supabase
-    .from('professional_documents')
-    .select('*')
-    .eq('professional_id', professionalId);
-
-  if (error) {
-    console.error('Errore caricamento documenti professionista:', error);
-    setProfessionalDocuments(baseSlots);
-    return;
-  }
-
-  const mapped = (data ?? []).map((row: any) => ({
-    id: row.document_type,
-    name: getDocumentLabel(row.document_type),
-    fileName: row.file_name ?? null,
-    uploadedAt: row.created_at ?? null,
-    status: row.status ?? 'draft',
-    rejectionReason: row.rejection_reason ?? null,
-    filePath: row.file_path ?? null,
-    downloadUrl: undefined,
-  }));
-
-  const merged = baseSlots.map((slot) => {
-    const found = mapped.find((doc) => doc.id === slot.id);
-    return found ?? slot;
-  });
-
-  setProfessionalDocuments(merged);
-};
     const { data, error } = await supabase
       .from('professional_availability')
       .select('*')
@@ -773,7 +779,13 @@ export default function App() {
       defaultAvailability.map((day) => {
         const slots = availabilityRows
           .filter((row) => row.weekday === dayMap[day.key])
-          .map((row) => createAvailabilitySlot(row.start_time.slice(0, 5), row.end_time.slice(0, 5), row.id));
+          .map((row) =>
+            createAvailabilitySlot(
+              row.start_time.slice(0, 5),
+              row.end_time.slice(0, 5),
+              row.id
+            )
+          );
 
         return {
           ...day,
@@ -785,13 +797,13 @@ export default function App() {
     setAvailabilitySaved(availabilityRows.length > 0);
   };
 
- const refreshProfessionalData = async (userId: string) => {
-  await Promise.all([
-    loadProfessionalServices(userId),
-    loadProfessionalAvailability(userId),
-    loadProfessionalDocuments(userId),
-  ]);
-};
+  const refreshProfessionalData = async (userId: string) => {
+    await Promise.all([
+      loadProfessionalServices(userId),
+      loadProfessionalAvailability(userId),
+      loadProfessionalDocuments(userId),
+    ]);
+  };
 
   useEffect(() => {
     void loadServiceCatalog();
@@ -959,23 +971,31 @@ export default function App() {
 
       setSessionUserId(user.id);
       setUserRole(role);
+      setScreen('tabs');
+      setTab('profile');
 
       if (role === 'professional') {
         hydrateProfessionalWorkflowState(user.id, user, profile);
-        await refreshProfessionalData(user.id);
+
+        try {
+          await refreshProfessionalData(user.id);
+        } catch (error) {
+          console.error('Errore refreshProfessionalData:', error);
+        }
       } else {
         resetProfessionalWorkflowState(user.email ?? '');
       }
 
-      setScreen('tabs');
-      setTab('profile');
+      setAuthReady(true);
     } catch (error) {
       console.error('Errore sincronizzazione auth/profiles:', error);
-      applyGuestState();
-      return;
-    }
 
-    setAuthReady(true);
+      setSessionUserId(user.id);
+      setUserRole('customer');
+      setScreen('tabs');
+      setTab('profile');
+      setAuthReady(true);
+    }
   };
 
   const bootstrapAuth = async () => {
@@ -992,7 +1012,7 @@ export default function App() {
       await syncAuthenticatedUser(session.user);
     } catch (error) {
       console.error('Errore bootstrap auth:', error);
-      applyGuestState();
+      setAuthReady(true);
     }
   };
 
@@ -1039,134 +1059,134 @@ export default function App() {
     alert('Foto profilo rimossa.');
   };
 
-const handleUploadProfessionalDocument = async (documentId: string, file: File) => {
-  if (!sessionUserId) {
-    throw new Error('Utente non autenticato');
-  }
+  const handleUploadProfessionalDocument = async (documentId: string, file: File) => {
+    if (!sessionUserId) {
+      throw new Error('Utente non autenticato');
+    }
 
-  const bucket = getDocumentBucket(documentId);
-  const ext = file.name.split('.').pop() || 'bin';
-  const filePath = `${sessionUserId}/${documentId}/${crypto.randomUUID()}.${ext}`;
+    const bucket = getDocumentBucket(documentId);
+    const ext = file.name.split('.').pop() || 'bin';
+    const filePath = `${sessionUserId}/${documentId}/${crypto.randomUUID()}.${ext}`;
 
-  const existing = professionalDocuments.find((doc) => doc.id === documentId);
+    const existing = professionalDocuments.find((doc) => doc.id === documentId);
 
-  if (existing?.filePath) {
-    await supabase.storage.from(bucket).remove([existing.filePath]).catch(() => undefined);
+    if (existing?.filePath) {
+      await supabase.storage.from(bucket).remove([existing.filePath]).catch(() => undefined);
 
-    await supabase
+      await supabase
+        .from('professional_documents')
+        .delete()
+        .eq('professional_id', sessionUserId)
+        .eq('document_type', documentId);
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, { upsert: false });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { error: insertError } = await supabase
+      .from('professional_documents')
+      .insert({
+        professional_id: sessionUserId,
+        document_type: documentId,
+        file_path: filePath,
+        file_name: file.name,
+        mime_type: file.type,
+        status: bucket === 'portfolio' ? 'draft' : 'pending',
+      });
+
+    if (insertError) {
+      throw new Error(insertError.message);
+    }
+
+    await loadProfessionalDocuments(sessionUserId);
+  };
+
+  const handleRemoveProfessionalDocument = async (documentId: string) => {
+    if (!sessionUserId) return;
+
+    const existing = professionalDocuments.find((doc) => doc.id === documentId);
+    if (!existing) return;
+
+    const bucket = getDocumentBucket(documentId);
+
+    if (existing.filePath) {
+      await supabase.storage.from(bucket).remove([existing.filePath]).catch(() => undefined);
+    }
+
+    const { error } = await supabase
       .from('professional_documents')
       .delete()
       .eq('professional_id', sessionUserId)
       .eq('document_type', documentId);
-  }
 
-  const { error: uploadError } = await supabase.storage
-    .from(bucket)
-    .upload(filePath, file, { upsert: false });
+    if (error) {
+      throw new Error(error.message);
+    }
 
-  if (uploadError) {
-    throw new Error(uploadError.message);
-  }
+    await loadProfessionalDocuments(sessionUserId);
+  };
 
-  const { error: insertError } = await supabase
-    .from('professional_documents')
-    .insert({
-      professional_id: sessionUserId,
-      document_type: documentId,
-      file_path: filePath,
-      file_name: file.name,
-      mime_type: file.type,
-      status: bucket === 'portfolio' ? 'draft' : 'pending',
-    });
+  const handleDownloadProfessionalDocument = async (documentId: string) => {
+    const target = professionalDocuments.find((doc) => doc.id === documentId);
 
-  if (insertError) {
-    throw new Error(insertError.message);
-  }
+    if (!target?.filePath || !target.fileName) {
+      alert('File non disponibile.');
+      return;
+    }
 
-  await loadProfessionalDocuments(sessionUserId);
-};
+    const bucket = getDocumentBucket(documentId);
 
-  const handleRemoveProfessionalDocument = async (documentId: string) => {
-  if (!sessionUserId) return;
+    if (bucket === 'portfolio') {
+      const { data } = supabase.storage.from(bucket).getPublicUrl(target.filePath);
+      window.open(data.publicUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
 
-  const existing = professionalDocuments.find((doc) => doc.id === documentId);
-  if (!existing) return;
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(target.filePath, 60);
 
-  const bucket = getDocumentBucket(documentId);
+    if (error || !data?.signedUrl) {
+      alert(error?.message || 'Impossibile aprire il file.');
+      return;
+    }
 
-  if (existing.filePath) {
-    await supabase.storage.from(bucket).remove([existing.filePath]).catch(() => undefined);
-  }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  };
 
-  const { error } = await supabase
-    .from('professional_documents')
-    .delete()
-    .eq('professional_id', sessionUserId)
-    .eq('document_type', documentId);
+  const handleSubmitDocuments = async () => {
+    if (!sessionUserId) {
+      throw new Error('Utente non autenticato');
+    }
 
-  if (error) {
-    throw new Error(error.message);
-  }
+    const requiredIds = ['identity_front', 'identity_back', 'tax_verification', 'cv'];
 
-  await loadProfessionalDocuments(sessionUserId);
-};
+    const uploadedRequired = professionalDocuments.filter(
+      (doc) => requiredIds.includes(doc.id) && !!doc.fileName
+    );
 
- const handleDownloadProfessionalDocument = async (documentId: string) => {
-  const target = professionalDocuments.find((doc) => doc.id === documentId);
+    if (uploadedRequired.length < 4) {
+      throw new Error('Carica tutti i documenti obbligatori prima di inviare.');
+    }
 
-  if (!target?.filePath || !target.fileName) {
-    alert('File non disponibile.');
-    return;
-  }
+    const { error } = await supabase
+      .from('professional_documents')
+      .update({ status: 'pending', rejection_reason: null })
+      .eq('professional_id', sessionUserId)
+      .in('document_type', requiredIds);
 
-  const bucket = getDocumentBucket(documentId);
+    if (error) {
+      throw new Error(error.message);
+    }
 
-  if (bucket === 'portfolio') {
-    const { data } = supabase.storage.from(bucket).getPublicUrl(target.filePath);
-    window.open(data.publicUrl, '_blank', 'noopener,noreferrer');
-    return;
-  }
-
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(target.filePath, 60);
-
-  if (error || !data?.signedUrl) {
-    alert(error?.message || 'Impossibile aprire il file.');
-    return;
-  }
-
-  window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
-};
-
-const handleSubmitDocuments = async () => {
-  if (!sessionUserId) {
-    throw new Error('Utente non autenticato');
-  }
-
-  const requiredIds = ['identity_front', 'identity_back', 'tax_verification', 'cv'];
-
-  const uploadedRequired = professionalDocuments.filter(
-    (doc) => requiredIds.includes(doc.id) && !!doc.fileName
-  );
-
-  if (uploadedRequired.length < 4) {
-    throw new Error('Carica tutti i documenti obbligatori prima di inviare.');
-  }
-
-  const { error } = await supabase
-    .from('professional_documents')
-    .update({ status: 'pending', rejection_reason: null })
-    .eq('professional_id', sessionUserId)
-    .in('document_type', requiredIds);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  await loadProfessionalDocuments(sessionUserId);
-  alert('Documenti inviati correttamente per verifica.');
-};
+    await loadProfessionalDocuments(sessionUserId);
+    alert('Documenti inviati correttamente per verifica.');
+  };
 
   const handlePriceChange = (service: string, price: string) => {
     setProfessionalServicePrices((prev) => {
@@ -1314,12 +1334,12 @@ const handleSubmitDocuments = async () => {
   };
 
   const requiredDocumentsApproved = useMemo(() => {
-  const requiredIds = ['identity_front', 'identity_back', 'tax_verification', 'cv'];
+    const requiredIds = ['identity_front', 'identity_back', 'tax_verification', 'cv'];
 
-  return requiredIds.every((requiredId) =>
-    professionalDocuments.some((doc) => doc.id === requiredId && doc.status === 'approved')
-  );
-}, [professionalDocuments]);
+    return requiredIds.every((requiredId) =>
+      professionalDocuments.some((doc) => doc.id === requiredId && doc.status === 'approved')
+    );
+  }, [professionalDocuments]);
 
   const contractsUnlocked = hasApprovedServices && requiredDocumentsApproved;
 
@@ -1741,7 +1761,16 @@ const handleSubmitDocuments = async () => {
             availability={professionalAvailability
               .filter((day) => day.enabled)
               .flatMap((day) => {
-                const weekdayMap: Record<AvailabilityDayKey, number> = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };
+                const weekdayMap: Record<AvailabilityDayKey, number> = {
+                  monday: 1,
+                  tuesday: 2,
+                  wednesday: 3,
+                  thursday: 4,
+                  friday: 5,
+                  saturday: 6,
+                  sunday: 7,
+                };
+
                 return day.slots.map((slot) => ({
                   id: slot.id,
                   professional_id: sessionUserId ?? '',
@@ -1754,34 +1783,61 @@ const handleSubmitDocuments = async () => {
               })}
             onSaveBaseProfile={async (payload) => {
               if (!sessionUserId) return;
-              const { error } = await supabase.from('profiles').update({
-                nome: payload.nome?.trim() ?? '',
-                cognome: payload.cognome?.trim() ?? '',
-                telefono: payload.telefono?.trim() ?? '',
-                citta: payload.citta?.trim() ?? '',
-                indirizzo: payload.indirizzo?.trim() ?? '',
-                bio: payload.bio?.trim() ?? '',
-                updated_at: new Date().toISOString(),
-              }).eq('id', sessionUserId);
+
+              const { error } = await supabase
+                .from('profiles')
+                .update({
+                  nome: payload.nome?.trim() ?? '',
+                  cognome: payload.cognome?.trim() ?? '',
+                  telefono: payload.telefono?.trim() ?? '',
+                  citta: payload.citta?.trim() ?? '',
+                  indirizzo: payload.indirizzo?.trim() ?? '',
+                  bio: payload.bio?.trim() ?? '',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', sessionUserId);
+
               if (error) throw error;
-              setProfessionalProfileData((prev) => buildProfessionalProfileData({ ...prev, ...payload, professional_status: professionalStatus }));
+
+              setProfessionalProfileData((prev) =>
+                buildProfessionalProfileData({
+                  ...prev,
+                  ...payload,
+                  professional_status: professionalStatus,
+                })
+              );
+
               alert('Profilo base salvato.');
             }}
             onSaveFiscalData={async (payload) => {
               if (!sessionUserId) return;
+
               const nextType = payload.tipoDocumentoFiscale?.trim() || 'piva';
-              const { error } = await supabase.from('profiles').update({
-                tipoDocumentoFiscale: nextType,
-                valoreDocumentoFiscale: payload.valoreDocumentoFiscale?.trim() ?? '',
-                intestatarioFatturazione: payload.intestatarioFatturazione?.trim() ?? '',
-                partitaIvaFatturazione: payload.partitaIvaFatturazione?.trim() ?? '',
-                pec: payload.pec?.trim() ?? '',
-                codiceDestinatario: payload.codiceDestinatario?.trim() ?? '',
-                has_vat: nextType === 'piva',
-                updated_at: new Date().toISOString(),
-              }).eq('id', sessionUserId);
+
+              const { error } = await supabase
+                .from('profiles')
+                .update({
+                  tipoDocumentoFiscale: nextType,
+                  valoreDocumentoFiscale: payload.valoreDocumentoFiscale?.trim() ?? '',
+                  intestatarioFatturazione: payload.intestatarioFatturazione?.trim() ?? '',
+                  partitaIvaFatturazione: payload.partitaIvaFatturazione?.trim() ?? '',
+                  pec: payload.pec?.trim() ?? '',
+                  codiceDestinatario: payload.codiceDestinatario?.trim() ?? '',
+                  has_vat: nextType === 'piva',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', sessionUserId);
+
               if (error) throw error;
-              setProfessionalProfileData((prev) => buildProfessionalProfileData({ ...prev, ...payload, tipoDocumentoFiscale: nextType }));
+
+              setProfessionalProfileData((prev) =>
+                buildProfessionalProfileData({
+                  ...prev,
+                  ...payload,
+                  tipoDocumentoFiscale: nextType,
+                })
+              );
+
               alert('Dati fiscali salvati.');
             }}
             onCreateService={async (payload) => {
@@ -1804,6 +1860,7 @@ const handleSubmitDocuments = async () => {
               }
 
               const description = payload.description.trim() || null;
+
               const insertAttempts = [
                 {
                   professional_id: sessionUserId,
@@ -1859,52 +1916,97 @@ const handleSubmitDocuments = async () => {
               throw new Error(lastError?.message || 'Impossibile aggiungere il servizio.');
             }}
             onDeleteService={async (serviceId) => {
-              const { error } = await supabase.from('professional_services').delete().eq('id', serviceId);
+              const { error } = await supabase
+                .from('professional_services')
+                .delete()
+                .eq('id', serviceId);
+
               if (error) throw error;
+
               if (sessionUserId) await loadProfessionalServices(sessionUserId);
               alert('Servizio eliminato.');
             }}
             onSubmitServices={async () => {
               if (!sessionUserId) return;
-              const { error } = await supabase.from('professional_services').update({ status: 'pending' }).eq('professional_id', sessionUserId).eq('is_active', true);
+
+              const { error } = await supabase
+                .from('professional_services')
+                .update({ status: 'pending' })
+                .eq('professional_id', sessionUserId)
+                .eq('is_active', true);
+
               if (error) throw error;
+
               await loadProfessionalServices(sessionUserId);
               alert('Servizi inviati in revisione.');
             }}
             onSaveAvailability={async (days) => {
               if (!sessionUserId) return;
-              const rows = days.filter((day) => day.enabled).flatMap((day) => day.slots.map((slot) => ({
-                professional_id: sessionUserId,
-                weekday: day.weekday,
-                start_time: slot.start_time,
-                end_time: slot.end_time,
-                is_active: true,
-              })));
-              const { error: deleteError } = await supabase.from('professional_availability').delete().eq('professional_id', sessionUserId);
+
+              const rows = days
+                .filter((day) => day.enabled)
+                .flatMap((day) =>
+                  day.slots.map((slot) => ({
+                    professional_id: sessionUserId,
+                    weekday: day.weekday,
+                    start_time: slot.start_time,
+                    end_time: slot.end_time,
+                    is_active: true,
+                  }))
+                );
+
+              const { error: deleteError } = await supabase
+                .from('professional_availability')
+                .delete()
+                .eq('professional_id', sessionUserId);
+
               if (deleteError) throw deleteError;
+
               if (rows.length > 0) {
-                const { error: insertError } = await supabase.from('professional_availability').insert(rows);
+                const { error: insertError } = await supabase
+                  .from('professional_availability')
+                  .insert(rows);
+
                 if (insertError) throw insertError;
               }
+
               await loadProfessionalAvailability(sessionUserId);
               alert('Disponibilità salvata.');
             }}
             onUploadDocument={handleUploadProfessionalDocument}
-onRemoveDocument={handleRemoveProfessionalDocument}
-onSubmitDocuments={handleSubmitDocuments}
+            onRemoveDocument={handleRemoveProfessionalDocument}
+            onSubmitDocuments={handleSubmitDocuments}
             onSubmitOnboarding={async () => {
               if (!sessionUserId) return;
+
               const nowIso = new Date().toISOString();
-              const { error } = await supabase.from('profiles').update({ professional_status: 'submitted', onboarding_completed: false, submitted_at: nowIso, updated_at: nowIso }).eq('id', sessionUserId);
+
+              const { error } = await supabase
+                .from('profiles')
+                .update({
+                  professional_status: 'submitted',
+                  onboarding_completed: false,
+                  submitted_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq('id', sessionUserId);
+
               if (error) throw error;
+
               setProfessionalStatus('submitted');
-              setProfessionalProfileData((prev) => ({ ...prev, professional_status: 'submitted', submitted_at: nowIso }));
+              setProfessionalProfileData((prev) => ({
+                ...prev,
+                professional_status: 'submitted',
+                submitted_at: nowIso,
+              }));
+
               alert('Onboarding inviato. Ora è in revisione admin.');
             }}
             onLogout={handleLogout}
           />
         );
       }
+
       return renderProfessionalProfile();
     }
 
@@ -1969,7 +2071,6 @@ onSubmitDocuments={handleSubmitDocuments}
       />
     );
   }
-
 
   if (screen === 'verifyOtp') {
     return (
@@ -2067,7 +2168,9 @@ onSubmitDocuments={handleSubmitDocuments}
 
       {tab === 'profile' && renderProfileTab()}
 
-      {screen === 'tabs' && tab !== 'profile' && <BottomNav current={tab} onChange={handleTabChange} />}
+      {screen === 'tabs' && tab !== 'profile' && (
+        <BottomNav current={tab} onChange={handleTabChange} />
+      )}
     </div>
   );
 }
