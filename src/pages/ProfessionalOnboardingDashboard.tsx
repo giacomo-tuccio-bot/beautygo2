@@ -42,7 +42,6 @@ type ServiceDraft = {
   price: string;
 };
 
-
 type ProfessionalDocument = DocumentRecord & {
   downloadUrl?: string;
 };
@@ -52,6 +51,17 @@ type DayConfig = {
   label: string;
   enabled: boolean;
   slots: Array<{ start_time: string; end_time: string }>;
+};
+
+type DocumentSlot = {
+  id: string;
+  name: string;
+  kind: 'single' | 'portfolio';
+  fileName?: string | null;
+  uploadedAt?: string | null;
+  status?: string | null;
+  rejectionReason?: string | null;
+  downloadUrl?: string;
 };
 
 const weekdayMeta: Array<{ weekday: number; label: string }> = [
@@ -91,7 +101,10 @@ function buildAvailabilityDraft(availability: AvailabilityRecord[]): DayConfig[]
   return weekdayMeta.map(({ weekday, label }) => {
     const daySlots = availability
       .filter((slot) => slot.weekday === weekday && slot.is_active)
-      .map((slot) => ({ start_time: slot.start_time.slice(0, 5), end_time: slot.end_time.slice(0, 5) }));
+      .map((slot) => ({
+        start_time: slot.start_time.slice(0, 5),
+        end_time: slot.end_time.slice(0, 5),
+      }));
 
     return {
       weekday,
@@ -100,6 +113,113 @@ function buildAvailabilityDraft(availability: AvailabilityRecord[]): DayConfig[]
       slots: daySlots.length > 0 ? daySlots : [{ start_time: '09:00', end_time: '18:00' }],
     };
   });
+}
+
+function normalizeDocumentStatus(status?: string | null): keyof typeof statusStyle {
+  if (status === 'pending') return 'in_review';
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'missing') return 'todo';
+  if (status === 'draft') return 'completed';
+  return 'todo';
+}
+
+function getDocumentStatusLabel(status?: string | null) {
+  if (status === 'missing') return 'Da caricare';
+  if (status === 'draft') return 'Caricato';
+  if (status === 'pending') return 'In verifica';
+  if (status === 'approved') return 'Approvato';
+  if (status === 'rejected') return 'Da correggere';
+  return 'Da caricare';
+}
+
+function formatUploadedAt(value?: string | null) {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleDateString('it-IT');
+  } catch {
+    return '';
+  }
+}
+
+function pickDoc(documents: ProfessionalDocument[], possibleIds: string[]) {
+  return documents.find((doc) => possibleIds.includes(doc.id));
+}
+
+function buildDocumentSlots(documents: ProfessionalDocument[]): {
+  requiredSlots: DocumentSlot[];
+  portfolioSlots: DocumentSlot[];
+  uploadedPortfolioCount: number;
+} {
+  const identityFront = pickDoc(documents, ['identity_front', 'document_front', 'id_front']);
+  const identityBack = pickDoc(documents, ['identity_back', 'document_back', 'id_back']);
+  const taxVerification = pickDoc(documents, ['tax_verification', 'fiscal_document', 'vat_document']);
+  const cv = pickDoc(documents, ['cv', 'resume']);
+
+  const requiredSlots: DocumentSlot[] = [
+    {
+      id: identityFront?.id ?? 'identity_front',
+      name: identityFront?.name ?? 'Documento identità fronte',
+      kind: 'single',
+      fileName: identityFront?.fileName,
+      uploadedAt: identityFront?.uploadedAt,
+      status: identityFront?.status ?? 'missing',
+      rejectionReason: identityFront?.rejectionReason,
+      downloadUrl: identityFront?.downloadUrl,
+    },
+    {
+      id: identityBack?.id ?? 'identity_back',
+      name: identityBack?.name ?? 'Documento identità retro',
+      kind: 'single',
+      fileName: identityBack?.fileName,
+      uploadedAt: identityBack?.uploadedAt,
+      status: identityBack?.status ?? 'missing',
+      rejectionReason: identityBack?.rejectionReason,
+      downloadUrl: identityBack?.downloadUrl,
+    },
+    {
+      id: taxVerification?.id ?? 'tax_verification',
+      name: taxVerification?.name ?? 'Verifica fiscale / P.IVA',
+      kind: 'single',
+      fileName: taxVerification?.fileName,
+      uploadedAt: taxVerification?.uploadedAt,
+      status: taxVerification?.status ?? 'missing',
+      rejectionReason: taxVerification?.rejectionReason,
+      downloadUrl: taxVerification?.downloadUrl,
+    },
+    {
+      id: cv?.id ?? 'cv',
+      name: cv?.name ?? 'Curriculum Vitae',
+      kind: 'single',
+      fileName: cv?.fileName,
+      uploadedAt: cv?.uploadedAt,
+      status: cv?.status ?? 'missing',
+      rejectionReason: cv?.rejectionReason,
+      downloadUrl: cv?.downloadUrl,
+    },
+  ];
+
+  const existingPortfolioDocs = documents
+    .filter((doc) => doc.id.startsWith('portfolio'))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const portfolioSlots: DocumentSlot[] = Array.from({ length: 5 }, (_, index) => {
+    const existing = existingPortfolioDocs[index];
+    return {
+      id: existing?.id ?? `portfolio_${index + 1}`,
+      name: existing?.name ?? `Foto lavoro ${index + 1}`,
+      kind: 'portfolio',
+      fileName: existing?.fileName,
+      uploadedAt: existing?.uploadedAt,
+      status: existing?.status ?? 'missing',
+      rejectionReason: existing?.rejectionReason,
+      downloadUrl: existing?.downloadUrl,
+    };
+  });
+
+  const uploadedPortfolioCount = portfolioSlots.filter((slot) => !!slot.fileName).length;
+
+  return { requiredSlots, portfolioSlots, uploadedPortfolioCount };
 }
 
 export default function ProfessionalOnboardingDashboard({
@@ -157,8 +277,13 @@ export default function ProfessionalOnboardingDashboard({
     setAvailabilityDraft(buildAvailabilityDraft(availability));
   }, [availability]);
 
-  const steps = useMemo(() => buildOnboardingSteps(profile, services, availability, documents), [profile, services, availability, documents]);
+  const steps = useMemo(
+    () => buildOnboardingSteps(profile, services, availability, documents),
+    [profile, services, availability, documents]
+  );
+
   const progress = useMemo(() => getProgressPercent(steps), [steps]);
+
   const canSubmit = useMemo(
     () =>
       isBaseProfileCompleted(profile) &&
@@ -167,6 +292,11 @@ export default function ProfessionalOnboardingDashboard({
       isAvailabilityCompleted(availability) &&
       isDocumentsCompleted(documents),
     [profile, services, availability, documents]
+  );
+
+  const { requiredSlots, portfolioSlots, uploadedPortfolioCount } = useMemo(
+    () => buildDocumentSlots(documents),
+    [documents]
   );
 
   const runBusy = async (task: () => Promise<void>) => {
@@ -179,6 +309,28 @@ export default function ProfessionalOnboardingDashboard({
       alert(error instanceof Error ? error.message : 'Operazione non riuscita.');
     } finally {
       setIsBusy(false);
+    }
+  };
+
+  const handlePortfolioFilesUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const emptySlots = portfolioSlots.filter((slot) => !slot.fileName);
+    if (emptySlots.length === 0) {
+      alert('Hai già caricato 5 foto lavori.');
+      return;
+    }
+
+    const filesToUpload = Array.from(files).slice(0, emptySlots.length);
+
+    await runBusy(async () => {
+      for (let i = 0; i < filesToUpload.length; i += 1) {
+        await onUploadDocument(emptySlots[i].id, filesToUpload[i]);
+      }
+    });
+
+    if (files.length > emptySlots.length) {
+      alert(`Puoi caricare massimo 5 foto. Ne sono state caricate ${emptySlots.length}.`);
     }
   };
 
@@ -204,7 +356,9 @@ export default function ProfessionalOnboardingDashboard({
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 18 }}>Avanzamento onboarding</div>
-              <div style={{ color: '#6B7280', fontSize: 14 }}>Stato reale letto da profilo, servizi e disponibilità.</div>
+              <div style={{ color: '#6B7280', fontSize: 14 }}>
+                Stato reale letto da profilo, servizi, disponibilità e documenti.
+              </div>
             </div>
             <div style={{ fontWeight: 800, fontSize: 26 }}>{progress}%</div>
           </div>
@@ -218,7 +372,9 @@ export default function ProfessionalOnboardingDashboard({
             <div key={step.key} style={card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontWeight: 800, color: colors.text }}>{step.order}. {step.title}</div>
+                  <div style={{ fontWeight: 800, color: colors.text }}>
+                    {step.order}. {step.title}
+                  </div>
                   <div style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>{step.description}</div>
                 </div>
                 <span style={{ ...badge, ...statusStyle[step.status] }}>{statusLabel[step.status]}</span>
@@ -262,7 +418,9 @@ export default function ProfessionalOnboardingDashboard({
             <div style={{ marginTop: 14 }}>
               <TextArea label="Bio" value={baseForm.bio ?? ''} onChange={(value) => setBaseForm((prev) => ({ ...prev, bio: value }))} />
             </div>
-            <button style={primaryButton} disabled={isBusy} onClick={() => runBusy(() => onSaveBaseProfile(baseForm))}>Salva profilo base</button>
+            <button style={primaryButton} disabled={isBusy} onClick={() => runBusy(() => onSaveBaseProfile(baseForm))}>
+              Salva profilo base
+            </button>
           </div>
         )}
 
@@ -273,23 +431,43 @@ export default function ProfessionalOnboardingDashboard({
               <SelectField
                 label="Tipo documento fiscale"
                 value={fiscalForm.tipoDocumentoFiscale ?? 'piva'}
-                onChange={(value) => setFiscalForm((prev) => ({
-                  ...prev,
-                  tipoDocumentoFiscale: value,
-                  has_vat: value === 'piva',
-                }))}
+                onChange={(value) =>
+                  setFiscalForm((prev) => ({
+                    ...prev,
+                    tipoDocumentoFiscale: value,
+                    has_vat: value === 'piva',
+                  }))
+                }
                 options={[
                   { value: 'piva', label: 'Partita IVA' },
                   { value: 'cf', label: 'Codice Fiscale' },
                 ]}
               />
-              <Input label="Valore documento fiscale" value={fiscalForm.valoreDocumentoFiscale ?? ''} onChange={(value) => setFiscalForm((prev) => ({ ...prev, valoreDocumentoFiscale: value }))} />
-              <Input label="Intestatario fatturazione" value={fiscalForm.intestatarioFatturazione ?? ''} onChange={(value) => setFiscalForm((prev) => ({ ...prev, intestatarioFatturazione: value }))} />
-              <Input label="Partita IVA" value={fiscalForm.partitaIvaFatturazione ?? ''} onChange={(value) => setFiscalForm((prev) => ({ ...prev, partitaIvaFatturazione: value }))} />
+              <Input
+                label="Valore documento fiscale"
+                value={fiscalForm.valoreDocumentoFiscale ?? ''}
+                onChange={(value) => setFiscalForm((prev) => ({ ...prev, valoreDocumentoFiscale: value }))}
+              />
+              <Input
+                label="Intestatario fatturazione"
+                value={fiscalForm.intestatarioFatturazione ?? ''}
+                onChange={(value) => setFiscalForm((prev) => ({ ...prev, intestatarioFatturazione: value }))}
+              />
+              <Input
+                label="Partita IVA"
+                value={fiscalForm.partitaIvaFatturazione ?? ''}
+                onChange={(value) => setFiscalForm((prev) => ({ ...prev, partitaIvaFatturazione: value }))}
+              />
               <Input label="PEC" value={fiscalForm.pec ?? ''} onChange={(value) => setFiscalForm((prev) => ({ ...prev, pec: value }))} />
-              <Input label="Codice destinatario" value={fiscalForm.codiceDestinatario ?? ''} onChange={(value) => setFiscalForm((prev) => ({ ...prev, codiceDestinatario: value }))} />
+              <Input
+                label="Codice destinatario"
+                value={fiscalForm.codiceDestinatario ?? ''}
+                onChange={(value) => setFiscalForm((prev) => ({ ...prev, codiceDestinatario: value }))}
+              />
             </div>
-            <button style={primaryButton} disabled={isBusy} onClick={() => runBusy(() => onSaveFiscalData(fiscalForm))}>Salva dati fiscali</button>
+            <button style={primaryButton} disabled={isBusy} onClick={() => runBusy(() => onSaveFiscalData(fiscalForm))}>
+              Salva dati fiscali
+            </button>
           </div>
         )}
 
@@ -325,10 +503,19 @@ export default function ProfessionalOnboardingDashboard({
                   return { value: String(minutes), label: `${minutes} min` };
                 })}
               />
-              <Input label="Prezzo (€)" type="number" value={serviceDraft.price} onChange={(value) => setServiceDraft((prev) => ({ ...prev, price: value }))} />
+              <Input
+                label="Prezzo (€)"
+                type="number"
+                value={serviceDraft.price}
+                onChange={(value) => setServiceDraft((prev) => ({ ...prev, price: value }))}
+              />
             </div>
             <div style={{ marginTop: 14 }}>
-              <TextArea label="Descrizione" value={serviceDraft.description} onChange={(value) => setServiceDraft((prev) => ({ ...prev, description: value }))} />
+              <TextArea
+                label="Descrizione"
+                value={serviceDraft.description}
+                onChange={(value) => setServiceDraft((prev) => ({ ...prev, description: value }))}
+              />
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
@@ -343,7 +530,11 @@ export default function ProfessionalOnboardingDashboard({
               >
                 Aggiungi servizio
               </button>
-              <button style={secondaryButton} disabled={isBusy || !services.some(isValidService)} onClick={() => runBusy(onSubmitServices)}>
+              <button
+                style={secondaryButton}
+                disabled={isBusy || !services.some(isValidService)}
+                onClick={() => runBusy(onSubmitServices)}
+              >
                 Invia servizi in revisione
               </button>
             </div>
@@ -361,10 +552,25 @@ export default function ProfessionalOnboardingDashboard({
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ ...badge, ...statusStyle[service.status === 'pending' ? 'in_review' : service.status === 'approved' ? 'approved' : service.status === 'rejected' ? 'rejected' : 'completed'] }}>
+                      <span
+                        style={{
+                          ...badge,
+                          ...statusStyle[
+                            service.status === 'pending'
+                              ? 'in_review'
+                              : service.status === 'approved'
+                              ? 'approved'
+                              : service.status === 'rejected'
+                              ? 'rejected'
+                              : 'completed'
+                          ],
+                        }}
+                      >
                         {service.status ?? 'draft'}
                       </span>
-                      <button style={dangerButton} disabled={isBusy} onClick={() => runBusy(() => onDeleteService(service.id))}>Elimina</button>
+                      <button style={dangerButton} disabled={isBusy} onClick={() => runBusy(() => onDeleteService(service.id))}>
+                        Elimina
+                      </button>
                     </div>
                   </div>
                 ))
@@ -384,7 +590,11 @@ export default function ProfessionalOnboardingDashboard({
                       type="checkbox"
                       checked={day.enabled}
                       onChange={(event) =>
-                        setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, enabled: event.target.checked } : item))
+                        setAvailabilityDraft((prev) =>
+                          prev.map((item, index) =>
+                            index === dayIndex ? { ...item, enabled: event.target.checked } : item
+                          )
+                        )
                       }
                     />
                     {day.label}
@@ -392,15 +602,71 @@ export default function ProfessionalOnboardingDashboard({
                   {day.enabled && (
                     <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                       {day.slots.map((slot, slotIndex) => (
-                        <div key={`${day.weekday}-${slotIndex}`} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <input type="time" step={900} value={slot.start_time} onChange={(event) => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.map((currentSlot, currentIndex) => currentIndex === slotIndex ? { ...currentSlot, start_time: event.target.value } : currentSlot) } : item))} style={timeInput} />
+                        <div
+                          key={`${day.weekday}-${slotIndex}`}
+                          style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}
+                        >
+                          <input
+                            type="time"
+                            step={900}
+                            value={slot.start_time}
+                            onChange={(event) =>
+                              setAvailabilityDraft((prev) =>
+                                prev.map((item, index) =>
+                                  index === dayIndex
+                                    ? {
+                                        ...item,
+                                        slots: item.slots.map((currentSlot, currentIndex) =>
+                                          currentIndex === slotIndex
+                                            ? { ...currentSlot, start_time: event.target.value }
+                                            : currentSlot
+                                        ),
+                                      }
+                                    : item
+                                )
+                              )
+                            }
+                            style={timeInput}
+                          />
                           <span style={{ color: '#6B7280' }}>→</span>
-                          <input type="time" step={900} value={slot.end_time} onChange={(event) => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.map((currentSlot, currentIndex) => currentIndex === slotIndex ? { ...currentSlot, end_time: event.target.value } : currentSlot) } : item))} style={timeInput} />
+                          <input
+                            type="time"
+                            step={900}
+                            value={slot.end_time}
+                            onChange={(event) =>
+                              setAvailabilityDraft((prev) =>
+                                prev.map((item, index) =>
+                                  index === dayIndex
+                                    ? {
+                                        ...item,
+                                        slots: item.slots.map((currentSlot, currentIndex) =>
+                                          currentIndex === slotIndex
+                                            ? { ...currentSlot, end_time: event.target.value }
+                                            : currentSlot
+                                        ),
+                                      }
+                                    : item
+                                )
+                              )
+                            }
+                            style={timeInput}
+                          />
                           {day.slots.length > 1 && (
                             <button
                               type="button"
                               style={smallGhostButton}
-                              onClick={() => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: item.slots.filter((_, currentIndex) => currentIndex !== slotIndex) } : item))}
+                              onClick={() =>
+                                setAvailabilityDraft((prev) =>
+                                  prev.map((item, index) =>
+                                    index === dayIndex
+                                      ? {
+                                          ...item,
+                                          slots: item.slots.filter((_, currentIndex) => currentIndex !== slotIndex),
+                                        }
+                                      : item
+                                  )
+                                )
+                              }
                             >
                               Rimuovi fascia
                             </button>
@@ -411,7 +677,18 @@ export default function ProfessionalOnboardingDashboard({
                         <button
                           type="button"
                           style={smallGhostButton}
-                          onClick={() => setAvailabilityDraft((prev) => prev.map((item, index) => index === dayIndex ? { ...item, slots: [...item.slots, { start_time: '09:00', end_time: '13:00' }] } : item))}
+                          onClick={() =>
+                            setAvailabilityDraft((prev) =>
+                              prev.map((item, index) =>
+                                index === dayIndex
+                                  ? {
+                                      ...item,
+                                      slots: [...item.slots, { start_time: '09:00', end_time: '13:00' }],
+                                    }
+                                  : item
+                              )
+                            )
+                          }
                         >
                           + Aggiungi fascia oraria
                         </button>
@@ -421,35 +698,49 @@ export default function ProfessionalOnboardingDashboard({
                 </div>
               ))}
             </div>
-            <button style={primaryButton} disabled={isBusy} onClick={() => runBusy(() => onSaveAvailability(availabilityDraft))}>Salva disponibilità</button>
+            <button style={primaryButton} disabled={isBusy} onClick={() => runBusy(() => onSaveAvailability(availabilityDraft))}>
+              Salva disponibilità
+            </button>
           </div>
         )}
-
 
         {editor === 'documents' && (
           <div style={card}>
             <div style={sectionTitle}>Step 5 · Documenti</div>
+            <div style={{ color: '#6B7280', fontSize: 14 }}>
+              Carica i documenti obbligatori, il CV e fino a 5 foto dei lavori svolti.
+            </div>
+
             <div style={{ display: 'grid', gap: 12 }}>
-              {documents.map((doc) => (
+              {requiredSlots.map((doc) => (
                 <div key={doc.id} style={serviceCard}>
                   <div>
                     <div style={{ fontWeight: 700 }}>{doc.name}</div>
                     <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
-                      {doc.fileName ? `${doc.fileName}${doc.uploadedAt ? ` · caricato ${new Date(doc.uploadedAt).toLocaleDateString('it-IT')}` : ''}` : 'Nessun file caricato'}
+                      {doc.fileName
+                        ? `${doc.fileName}${doc.uploadedAt ? ` · caricato ${formatUploadedAt(doc.uploadedAt)}` : ''}`
+                        : 'Nessun file caricato'}
                     </div>
                     {doc.rejectionReason ? (
                       <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 6 }}>{doc.rejectionReason}</div>
                     ) : null}
                   </div>
                   <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
-                    <span style={{ ...badge, ...statusStyle[doc.status === 'missing' ? 'todo' : doc.status === 'pending' ? 'in_review' : doc.status === 'approved' ? 'approved' : doc.status === 'rejected' ? 'rejected' : 'completed'] }}>
-                      {doc.status === 'missing' ? 'Da caricare' : doc.status === 'draft' ? 'Caricato' : doc.status === 'pending' ? 'In verifica' : doc.status === 'approved' ? 'Approvato' : 'Da correggere'}
+                    <span style={{ ...badge, ...statusStyle[normalizeDocumentStatus(doc.status)] }}>
+                      {getDocumentStatusLabel(doc.status)}
                     </span>
+
+                    {doc.downloadUrl ? (
+                      <a href={doc.downloadUrl} target="_blank" rel="noreferrer" style={smallGhostButton}>
+                        Apri file
+                      </a>
+                    ) : null}
+
                     <label style={smallGhostButton}>
                       <input
                         type="file"
                         style={{ display: 'none' }}
-                        accept={doc.id.startsWith('portfolio') ? 'image/*' : '.pdf,image/*'}
+                        accept={doc.id === 'cv' ? '.pdf,.doc,.docx' : '.pdf,image/*'}
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (file) {
@@ -460,8 +751,14 @@ export default function ProfessionalOnboardingDashboard({
                       />
                       {doc.fileName ? 'Sostituisci file' : 'Carica file'}
                     </label>
+
                     {doc.fileName ? (
-                      <button type="button" style={dangerButton} disabled={isBusy} onClick={() => runBusy(() => onRemoveDocument(doc.id))}>
+                      <button
+                        type="button"
+                        style={dangerButton}
+                        disabled={isBusy}
+                        onClick={() => runBusy(() => onRemoveDocument(doc.id))}
+                      >
                         Rimuovi
                       </button>
                     ) : null}
@@ -469,8 +766,93 @@ export default function ProfessionalOnboardingDashboard({
                 </div>
               ))}
             </div>
+
+            <div style={portfolioWrap}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 800, color: colors.text }}>Foto lavori svolti</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
+                    Puoi caricare fino a 5 immagini. Caricate: {uploadedPortfolioCount}/5
+                  </div>
+                </div>
+
+                <label
+                  style={{
+                    ...smallGhostButton,
+                    opacity: uploadedPortfolioCount >= 5 ? 0.5 : 1,
+                    cursor: uploadedPortfolioCount >= 5 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    disabled={uploadedPortfolioCount >= 5}
+                    onChange={(event) => {
+                      void handlePortfolioFilesUpload(event.target.files);
+                      event.currentTarget.value = '';
+                    }}
+                  />
+                  Aggiungi foto
+                </label>
+              </div>
+
+              <div style={portfolioGrid}>
+                {portfolioSlots.map((slot) => (
+                  <div key={slot.id} style={portfolioCard}>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{slot.name}</div>
+                      <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
+                        {slot.fileName
+                          ? `${slot.fileName}${slot.uploadedAt ? ` · caricato ${formatUploadedAt(slot.uploadedAt)}` : ''}`
+                          : 'Slot libero'}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <span style={{ ...badge, ...statusStyle[normalizeDocumentStatus(slot.status)] }}>
+                        {slot.fileName ? 'Caricata' : 'Vuota'}
+                      </span>
+
+                      <label style={smallGhostButton}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) {
+                              void runBusy(() => onUploadDocument(slot.id, file));
+                              event.currentTarget.value = '';
+                            }
+                          }}
+                        />
+                        {slot.fileName ? 'Sostituisci' : 'Carica'}
+                      </label>
+
+                      {slot.fileName ? (
+                        <button
+                          type="button"
+                          style={dangerButton}
+                          disabled={isBusy}
+                          onClick={() => runBusy(() => onRemoveDocument(slot.id))}
+                        >
+                          Rimuovi
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button style={primaryButton} disabled={isBusy || !documents.some((doc) => !!doc.fileName)} onClick={() => runBusy(onSubmitDocuments)}>
+              <button
+                style={primaryButton}
+                disabled={isBusy || !requiredSlots.some((doc) => !!doc.fileName)}
+                onClick={() => runBusy(onSubmitDocuments)}
+              >
                 Invia documenti in verifica
               </button>
             </div>
@@ -492,7 +874,17 @@ export default function ProfessionalOnboardingDashboard({
   );
 }
 
-function Input({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string; }) {
+function Input({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
   return (
     <label style={{ display: 'grid', gap: 6 }}>
       <span style={labelStyle}>{label}</span>
@@ -501,16 +893,38 @@ function Input({ label, value, onChange, type = 'text' }: { label: string; value
   );
 }
 
-function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void; }) {
+function TextArea({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <label style={{ display: 'grid', gap: 6 }}>
       <span style={labelStyle}>{label}</span>
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} style={{ ...inputStyle, minHeight: 110, padding: 12 }} />
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        style={{ ...inputStyle, minHeight: 110, padding: 12 }}
+      />
     </label>
   );
 }
 
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; }) {
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
   return (
     <label style={{ display: 'grid', gap: 6 }}>
       <span style={labelStyle}>{label}</span>
@@ -531,6 +945,10 @@ const smallGhostButton: CSSProperties = {
   padding: '8px 12px',
   fontWeight: 700,
   cursor: 'pointer',
+  textDecoration: 'none',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
 const pageStyle: CSSProperties = {
@@ -691,4 +1109,26 @@ const timeInput: CSSProperties = {
   borderRadius: 12,
   border: '1px solid #E7D9CD',
   padding: '0 12px',
+};
+
+const portfolioWrap: CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid #F1E4D8',
+  padding: 16,
+  display: 'grid',
+  gap: 14,
+};
+
+const portfolioGrid: CSSProperties = {
+  display: 'grid',
+  gap: 12,
+  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+};
+
+const portfolioCard: CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid #F1E4D8',
+  padding: 14,
+  display: 'grid',
+  gap: 10,
 };

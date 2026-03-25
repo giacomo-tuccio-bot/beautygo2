@@ -1,0 +1,220 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { listProfessionalDocuments, removeProfessionalDocument, uploadProfessionalDocument } from '../../lib/documents';
+
+type DocumentRow = {
+  id: string;
+  document_type: string;
+  file_name: string | null;
+  file_path: string;
+  status?: 'pending' | 'approved' | 'rejected' | null;
+};
+
+const REQUIRED_DOCS = [
+  { key: 'identity_front', label: 'Documento identità fronte', accept: '.pdf,.jpg,.jpeg,.png,.webp' },
+  { key: 'identity_back', label: 'Documento identità retro', accept: '.pdf,.jpg,.jpeg,.png,.webp' },
+  { key: 'tax_verification', label: 'Verifica fiscale / P.IVA', accept: '.pdf,.jpg,.jpeg,.png,.webp' },
+  { key: 'cv', label: 'Curriculum Vitae', accept: '.pdf,.doc,.docx' },
+];
+
+const MAX_PORTFOLIO = 5;
+
+export default function DocumentsStep({ professionalId }: { professionalId: string }) {
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  async function refresh() {
+    const rows = await listProfessionalDocuments(professionalId);
+    setDocuments(rows);
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, [professionalId]);
+
+  const portfolioDocs = useMemo(
+    () => documents.filter((d) => d.document_type.startsWith('portfolio_')),
+    [documents]
+  );
+
+  async function handleSingleUpload(file: File, documentType: string, bucket: 'documents' | 'portfolio') {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      await uploadProfessionalDocument({
+        professionalId,
+        file,
+        bucket,
+        documentType,
+      });
+      await refresh();
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Upload non riuscito');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePortfolioUpload(files: File[]) {
+    setErrorMessage('');
+
+    const remainingSlots = MAX_PORTFOLIO - portfolioDocs.length;
+    if (remainingSlots <= 0) {
+      setErrorMessage(`Hai già caricato ${MAX_PORTFOLIO} foto lavori.`);
+      return;
+    }
+
+    const filesToUpload = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      setErrorMessage(`Puoi caricare al massimo ${MAX_PORTFOLIO} foto. Verranno caricate solo le prime ${remainingSlots}.`);
+    }
+
+    setLoading(true);
+    try {
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        await uploadProfessionalDocument({
+          professionalId,
+          file,
+          bucket: 'portfolio',
+          documentType: `portfolio_${Date.now()}_${i}`,
+        });
+      }
+      await refresh();
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Upload portfolio non riuscito');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete(doc: DocumentRow) {
+    setErrorMessage('');
+    try {
+      const bucket = doc.document_type.startsWith('portfolio_') ? 'portfolio' : 'documents';
+      await removeProfessionalDocument(doc.id, doc.file_path, bucket);
+      await refresh();
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Eliminazione non riuscita');
+    }
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm border border-orange-100">
+      <div className="mb-5">
+        <h3 className="text-lg font-bold">5. Documenti</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Carica i documenti obbligatori per la verifica, il CV e fino a 5 foto dei lavori svolti.
+        </p>
+      </div>
+
+      <div className="grid gap-4">
+        {REQUIRED_DOCS.map((item) => {
+          const existing = documents.find((d) => d.document_type === item.key);
+
+          return (
+            <div key={item.key} className="rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-semibold">{item.label}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {existing ? `Caricato: ${existing.file_name || 'file'}` : 'Non caricato'}
+                  </div>
+                </div>
+
+                <div className="text-xs">
+                  {existing?.status === 'approved' && (
+                    <span className="px-2 py-1 rounded-full bg-green-100 text-green-700">Approvato</span>
+                  )}
+                  {existing?.status === 'rejected' && (
+                    <span className="px-2 py-1 rounded-full bg-red-100 text-red-700">Rifiutato</span>
+                  )}
+                  {existing && (!existing.status || existing.status === 'pending') && (
+                    <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700">In revisione</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-3 flex-wrap">
+                <label className="rounded-xl px-4 py-2 bg-orange-500 text-white font-medium cursor-pointer">
+                  {existing ? 'Sostituisci file' : 'Carica file'}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept={item.accept}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleSingleUpload(file, item.key, 'documents');
+                    }}
+                  />
+                </label>
+
+                {existing && (
+                  <button
+                    onClick={() => void handleDelete(existing)}
+                    className="rounded-xl px-4 py-2 bg-gray-100 text-gray-700 font-medium"
+                  >
+                    Elimina
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="rounded-xl border border-gray-200 p-4">
+          <div className="font-semibold">Foto lavori svolti</div>
+          <div className="text-xs text-gray-500 mt-1">
+            Puoi caricare fino a {MAX_PORTFOLIO} immagini. Attualmente: {portfolioDocs.length}/{MAX_PORTFOLIO}
+          </div>
+
+          <div className="mt-3">
+            <label className={`rounded-xl px-4 py-2 font-medium inline-block ${
+              portfolioDocs.length >= MAX_PORTFOLIO
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-black text-white cursor-pointer'
+            }`}>
+              Aggiungi foto
+              <input
+                type="file"
+                className="hidden"
+                accept=".jpg,.jpeg,.png,.webp"
+                multiple
+                disabled={portfolioDocs.length >= MAX_PORTFOLIO}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) void handlePortfolioUpload(files);
+                }}
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {portfolioDocs.length === 0 ? (
+              <div className="text-sm text-gray-500">Nessuna foto caricata.</div>
+            ) : (
+              portfolioDocs.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="rounded-lg border border-gray-200 p-3 flex items-center justify-between gap-3"
+                >
+                  <div className="text-sm truncate">{doc.file_name || 'Foto portfolio'}</div>
+                  <button
+                    onClick={() => void handleDelete(doc)}
+                    className="rounded-lg px-3 py-1 bg-gray-100 text-gray-700"
+                  >
+                    Elimina
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {loading && <div className="mt-4 text-sm text-gray-500">Caricamento in corso...</div>}
+      {errorMessage && <div className="mt-4 text-sm text-red-600">{errorMessage}</div>}
+    </div>
+  );
+}
