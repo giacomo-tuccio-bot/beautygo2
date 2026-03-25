@@ -174,6 +174,9 @@ export default function ProfessionalOnboardingDashboard({
     setIsBusy(true);
     try {
       await task();
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : 'Operazione non riuscita.');
     } finally {
       setIsBusy(false);
     }

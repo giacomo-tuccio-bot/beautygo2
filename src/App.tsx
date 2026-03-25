@@ -1677,38 +1677,77 @@ export default function App() {
             }}
             onCreateService={async (payload) => {
               if (!sessionUserId) return;
+
               const selected = serviceCatalog.find((item) => item.id === payload.catalog_id);
               if (!selected) {
-                alert('Seleziona un servizio dal catalogo.');
-                return;
+                throw new Error('Seleziona un servizio dal catalogo.');
               }
 
-              const baseInsert = {
-                professional_id: sessionUserId,
-                name: selected.name,
-                description: payload.description.trim() || null,
-                duration_minutes: Number(payload.duration_minutes),
-                price: Number(payload.price),
-                category: selected.category ?? null,
-                status: 'draft',
-                is_active: true,
-              };
+              const duration = Number(payload.duration_minutes);
+              const price = Number(payload.price);
 
-              let error: any = null;
-              const firstTry = await supabase.from('professional_services').insert({
-                ...baseInsert,
-                catalog_id: selected.id,
-              });
-              error = firstTry.error;
-
-              if (error && String(error.message || '').toLowerCase().includes('catalog_id')) {
-                const fallback = await supabase.from('professional_services').insert(baseInsert);
-                error = fallback.error;
+              if (!Number.isFinite(duration) || duration <= 0) {
+                throw new Error('Durata servizio non valida.');
               }
 
-              if (error) throw error;
-              await loadProfessionalServices(sessionUserId);
-              alert('Servizio aggiunto.');
+              if (!Number.isFinite(price) || price <= 0) {
+                throw new Error('Inserisci un prezzo valido.');
+              }
+
+              const description = payload.description.trim() || null;
+              const insertAttempts = [
+                {
+                  professional_id: sessionUserId,
+                  catalog_id: selected.id,
+                  name: selected.name,
+                  description,
+                  duration_minutes: duration,
+                  price,
+                  category: selected.category ?? null,
+                  status: 'draft',
+                  is_active: true,
+                },
+                {
+                  professional_id: sessionUserId,
+                  name: selected.name,
+                  description,
+                  duration_minutes: duration,
+                  price,
+                  category: selected.category ?? null,
+                  status: 'draft',
+                  is_active: true,
+                },
+                {
+                  professional_id: sessionUserId,
+                  name: selected.name,
+                  description,
+                  duration_minutes: duration,
+                  price,
+                  category: selected.category ?? null,
+                  is_active: true,
+                },
+                {
+                  professional_id: sessionUserId,
+                  name: selected.name,
+                  duration_minutes: duration,
+                  price,
+                },
+              ];
+
+              let lastError: any = null;
+
+              for (const attempt of insertAttempts) {
+                const response = await supabase.from('professional_services').insert(attempt);
+                if (!response.error) {
+                  await loadProfessionalServices(sessionUserId);
+                  alert('Servizio aggiunto.');
+                  return;
+                }
+                lastError = response.error;
+              }
+
+              console.error('Errore inserimento servizio:', lastError);
+              throw new Error(lastError?.message || 'Impossibile aggiungere il servizio.');
             }}
             onDeleteService={async (serviceId) => {
               const { error } = await supabase.from('professional_services').delete().eq('id', serviceId);
