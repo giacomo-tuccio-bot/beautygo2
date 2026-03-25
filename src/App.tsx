@@ -319,13 +319,17 @@ const getProfessionalStorageKey = (userId: string) => `${STORAGE_KEY}:${userId}`
 const createDefaultDocuments = (tipoDocumentoFiscale: string): ProfessionalDocument[] => {
   const fiscalDocumentName =
     tipoDocumentoFiscale === 'piva'
-      ? 'Documento Partita IVA'
+      ? 'Verifica Partita IVA'
       : 'Codice Fiscale / Tessera sanitaria';
 
   return [
-    { id: 'identity-document', name: 'Documento di identità', status: 'missing' },
+    { id: 'identity-front', name: 'Documento identità fronte', status: 'missing' },
+    { id: 'identity-back', name: 'Documento identità retro', status: 'missing' },
     { id: 'tax-document', name: fiscalDocumentName, status: 'missing' },
-    { id: 'professional-certificate', name: 'Certificazione professionale', status: 'missing' },
+    { id: 'cv-document', name: 'Curriculum Vitae', status: 'missing' },
+    { id: 'portfolio-1', name: 'Foto lavori 1', status: 'missing' },
+    { id: 'portfolio-2', name: 'Foto lavori 2', status: 'missing' },
+    { id: 'portfolio-3', name: 'Foto lavori 3', status: 'missing' },
   ];
 };
 
@@ -1623,6 +1627,7 @@ export default function App() {
             onChangeTab={handleTabChange}
             profile={professionalProfileData}
             services={professionalServices}
+            documents={professionalDocuments}
             serviceCatalog={serviceCatalog}
             availability={professionalAvailability
               .filter((day) => day.enabled)
@@ -1678,9 +1683,8 @@ export default function App() {
                 return;
               }
 
-              const { error } = await supabase.from('professional_services').insert({
+              const baseInsert = {
                 professional_id: sessionUserId,
-                catalog_id: selected.id,
                 name: selected.name,
                 description: payload.description.trim() || null,
                 duration_minutes: Number(payload.duration_minutes),
@@ -1688,7 +1692,20 @@ export default function App() {
                 category: selected.category ?? null,
                 status: 'draft',
                 is_active: true,
+              };
+
+              let error: any = null;
+              const firstTry = await supabase.from('professional_services').insert({
+                ...baseInsert,
+                catalog_id: selected.id,
               });
+              error = firstTry.error;
+
+              if (error && String(error.message || '').toLowerCase().includes('catalog_id')) {
+                const fallback = await supabase.from('professional_services').insert(baseInsert);
+                error = fallback.error;
+              }
+
               if (error) throw error;
               await loadProfessionalServices(sessionUserId);
               alert('Servizio aggiunto.');
@@ -1723,6 +1740,15 @@ export default function App() {
               }
               await loadProfessionalAvailability(sessionUserId);
               alert('Disponibilità salvata.');
+            }}
+            onUploadDocument={async (documentId, file) => {
+              handleUploadProfessionalDocument(documentId, file);
+            }}
+            onRemoveDocument={async (documentId) => {
+              handleRemoveProfessionalDocument(documentId);
+            }}
+            onSubmitDocuments={async () => {
+              handleSubmitDocuments();
             }}
             onSubmitOnboarding={async () => {
               if (!sessionUserId) return;

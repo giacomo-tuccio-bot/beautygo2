@@ -6,16 +6,18 @@ import {
   getProgressPercent,
   isAvailabilityCompleted,
   isBaseProfileCompleted,
+  isDocumentsCompleted,
   isFiscalDataCompleted,
   isValidService,
   type AvailabilityRecord,
+  type DocumentRecord,
   type OnboardingStep,
   type ProfileForOnboarding,
   type ServiceRecord,
 } from '../lib/onboarding';
 
 type Tab = 'home' | 'discover' | 'bookings' | 'profile';
-type EditorKey = 'base' | 'fiscal' | 'services' | 'availability';
+type EditorKey = 'base' | 'fiscal' | 'services' | 'availability' | 'documents';
 
 type ProfileForm = ProfileForOnboarding & {
   email?: string | null;
@@ -38,6 +40,11 @@ type ServiceDraft = {
   description: string;
   duration_minutes: string;
   price: string;
+};
+
+
+type ProfessionalDocument = DocumentRecord & {
+  downloadUrl?: string;
 };
 
 type DayConfig = {
@@ -101,6 +108,7 @@ export default function ProfessionalOnboardingDashboard({
   profile,
   services,
   availability,
+  documents,
   serviceCatalog,
   onSaveBaseProfile,
   onSaveFiscalData,
@@ -108,6 +116,9 @@ export default function ProfessionalOnboardingDashboard({
   onDeleteService,
   onSubmitServices,
   onSaveAvailability,
+  onUploadDocument,
+  onRemoveDocument,
+  onSubmitDocuments,
   onSubmitOnboarding,
   onLogout,
 }: {
@@ -116,6 +127,7 @@ export default function ProfessionalOnboardingDashboard({
   profile: ProfileForm;
   services: ServiceRecord[];
   availability: AvailabilityRecord[];
+  documents: ProfessionalDocument[];
   serviceCatalog: CatalogService[];
   onSaveBaseProfile: (payload: ProfileForm) => Promise<void>;
   onSaveFiscalData: (payload: ProfileForm) => Promise<void>;
@@ -123,6 +135,9 @@ export default function ProfessionalOnboardingDashboard({
   onDeleteService: (serviceId: string) => Promise<void>;
   onSubmitServices: () => Promise<void>;
   onSaveAvailability: (days: DayConfig[]) => Promise<void>;
+  onUploadDocument: (documentId: string, file: File) => Promise<void>;
+  onRemoveDocument: (documentId: string) => Promise<void>;
+  onSubmitDocuments: () => Promise<void>;
   onSubmitOnboarding: () => Promise<void>;
   onLogout: () => void;
 }) {
@@ -142,15 +157,16 @@ export default function ProfessionalOnboardingDashboard({
     setAvailabilityDraft(buildAvailabilityDraft(availability));
   }, [availability]);
 
-  const steps = useMemo(() => buildOnboardingSteps(profile, services, availability), [profile, services, availability]);
+  const steps = useMemo(() => buildOnboardingSteps(profile, services, availability, documents), [profile, services, availability, documents]);
   const progress = useMemo(() => getProgressPercent(steps), [steps]);
   const canSubmit = useMemo(
     () =>
       isBaseProfileCompleted(profile) &&
       isFiscalDataCompleted(profile) &&
       services.some(isValidService) &&
-      isAvailabilityCompleted(availability),
-    [profile, services, availability]
+      isAvailabilityCompleted(availability) &&
+      isDocumentsCompleted(documents),
+    [profile, services, availability, documents]
   );
 
   const runBusy = async (task: () => Promise<void>) => {
@@ -214,6 +230,7 @@ export default function ProfessionalOnboardingDashboard({
             { key: 'fiscal', label: 'Step 2' },
             { key: 'services', label: 'Step 3' },
             { key: 'availability', label: 'Step 4' },
+            { key: 'documents', label: 'Step 5' },
           ].map((item) => (
             <button
               key={item.key}
@@ -405,10 +422,62 @@ export default function ProfessionalOnboardingDashboard({
           </div>
         )}
 
+
+        {editor === 'documents' && (
+          <div style={card}>
+            <div style={sectionTitle}>Step 5 · Documenti</div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {documents.map((doc) => (
+                <div key={doc.id} style={serviceCard}>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{doc.name}</div>
+                    <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
+                      {doc.fileName ? `${doc.fileName}${doc.uploadedAt ? ` · caricato ${new Date(doc.uploadedAt).toLocaleDateString('it-IT')}` : ''}` : 'Nessun file caricato'}
+                    </div>
+                    {doc.rejectionReason ? (
+                      <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 6 }}>{doc.rejectionReason}</div>
+                    ) : null}
+                  </div>
+                  <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
+                    <span style={{ ...badge, ...statusStyle[doc.status === 'missing' ? 'todo' : doc.status === 'pending' ? 'in_review' : doc.status === 'approved' ? 'approved' : doc.status === 'rejected' ? 'rejected' : 'completed'] }}>
+                      {doc.status === 'missing' ? 'Da caricare' : doc.status === 'draft' ? 'Caricato' : doc.status === 'pending' ? 'In verifica' : doc.status === 'approved' ? 'Approvato' : 'Da correggere'}
+                    </span>
+                    <label style={smallGhostButton}>
+                      <input
+                        type="file"
+                        style={{ display: 'none' }}
+                        accept={doc.id.startsWith('portfolio') ? 'image/*' : '.pdf,image/*'}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) {
+                            void runBusy(() => onUploadDocument(doc.id, file));
+                            event.currentTarget.value = '';
+                          }
+                        }}
+                      />
+                      {doc.fileName ? 'Sostituisci file' : 'Carica file'}
+                    </label>
+                    {doc.fileName ? (
+                      <button type="button" style={dangerButton} disabled={isBusy} onClick={() => runBusy(() => onRemoveDocument(doc.id))}>
+                        Rimuovi
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button style={primaryButton} disabled={isBusy || !documents.some((doc) => !!doc.fileName)} onClick={() => runBusy(onSubmitDocuments)}>
+                Invia documenti in verifica
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={card}>
           <div style={sectionTitle}>Invio finale</div>
           <div style={{ color: '#6B7280', fontSize: 14, marginBottom: 12 }}>
-            Quando i primi 4 step sono completi, puoi inviare l'onboarding. Lo stato globale diventa <strong>submitted</strong>.
+            Quando i primi 5 step sono completi, puoi inviare l'onboarding. Lo stato globale diventa <strong>submitted</strong>.
           </div>
           <button style={primaryButton} disabled={!canSubmit || isBusy} onClick={() => runBusy(onSubmitOnboarding)}>
             Invia onboarding

@@ -1,7 +1,7 @@
 export type OnboardingStepStatus = 'todo' | 'completed' | 'in_review' | 'approved' | 'rejected';
 
 export type OnboardingStep = {
-  key: 'base_profile' | 'fiscal_data' | 'services' | 'availability' | 'final_submission';
+  key: 'base_profile' | 'fiscal_data' | 'services' | 'availability' | 'documents' | 'final_submission';
   order: number;
   title: string;
   description: string;
@@ -29,6 +29,16 @@ export type AvailabilityRecord = {
   end_time: string;
   is_active: boolean;
   created_at: string | null;
+};
+
+
+export type DocumentRecord = {
+  id: string;
+  name: string;
+  fileName?: string;
+  uploadedAt?: string;
+  status: 'missing' | 'draft' | 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
 };
 
 export type ProfileForOnboarding = {
@@ -94,10 +104,33 @@ export const isAvailabilityCompleted = (availability: AvailabilityRecord[]) =>
 export const getAvailabilityStepStatus = (availability: AvailabilityRecord[]): OnboardingStepStatus =>
   isAvailabilityCompleted(availability) ? 'completed' : 'todo';
 
+const requiredDocumentIds = ['identity-front', 'identity-back', 'tax-document', 'cv-document'];
+const portfolioDocumentIds = ['portfolio-1', 'portfolio-2', 'portfolio-3'];
+
+export const isDocumentsCompleted = (documents: DocumentRecord[]) => {
+  const hasRequired = requiredDocumentIds.every((id) => documents.some((doc) => doc.id === id && !!doc.fileName));
+  const hasPortfolio = portfolioDocumentIds.some((id) => documents.some((doc) => doc.id === id && !!doc.fileName));
+  return hasRequired && hasPortfolio;
+};
+
+export const getDocumentsStepStatus = (documents: DocumentRecord[]): OnboardingStepStatus => {
+  if (!isDocumentsCompleted(documents)) return 'todo';
+
+  const relevantDocuments = documents.filter(
+    (doc) => requiredDocumentIds.includes(doc.id) || portfolioDocumentIds.includes(doc.id)
+  );
+
+  if (relevantDocuments.some((doc) => doc.status === 'rejected')) return 'rejected';
+  if (relevantDocuments.every((doc) => !doc.fileName || doc.status === 'approved')) return 'approved';
+  if (relevantDocuments.some((doc) => doc.fileName && doc.status === 'pending')) return 'in_review';
+  return 'completed';
+};
+
 export const buildOnboardingSteps = (
   profile: ProfileForOnboarding,
   services: ServiceRecord[],
-  availability: AvailabilityRecord[]
+  availability: AvailabilityRecord[],
+  documents: DocumentRecord[] = []
 ): OnboardingStep[] => {
   const baseProfileStatus: OnboardingStepStatus = isBaseProfileCompleted(profile)
     ? 'completed'
@@ -107,13 +140,14 @@ export const buildOnboardingSteps = (
     : 'todo';
   const servicesStatus = getServicesStepStatus(services);
   const availabilityStatus = getAvailabilityStepStatus(availability);
+  const documentsStatus = getDocumentsStepStatus(documents);
   const finalSubmissionStatus: OnboardingStepStatus =
     profile.professional_status === 'approved'
       ? 'approved'
       : profile.professional_status === 'submitted'
       ? 'in_review'
-      : [baseProfileStatus, fiscalStatus, servicesStatus, availabilityStatus].every((status) =>
-          ['completed', 'approved'].includes(status)
+      : [baseProfileStatus, fiscalStatus, servicesStatus, availabilityStatus, documentsStatus].every((status) =>
+          ['completed', 'approved', 'in_review'].includes(status)
         )
       ? 'completed'
       : 'todo';
@@ -148,8 +182,15 @@ export const buildOnboardingSteps = (
       status: availabilityStatus,
     },
     {
-      key: 'final_submission',
+      key: 'documents',
       order: 5,
+      title: 'Documenti',
+      description: 'Documento identità, verifica fiscale, CV e almeno una foto lavori.',
+      status: documentsStatus,
+    },
+    {
+      key: 'final_submission',
+      order: 6,
       title: 'Invio finale',
       description: 'Invia l\'onboarding per la revisione admin.',
       status: finalSubmissionStatus,
